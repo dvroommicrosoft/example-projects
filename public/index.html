@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tiny Triage</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="app-header">
+      <h1>🗂️ Tiny Triage</h1>
+      <p class="subtitle">A tiny board for triaging tasks and issues.</p>
+    </header>
+
+    <main>
+      <form id="add-form" class="add-form" autocomplete="off">
+        <label for="title-input" class="sr-only">New item title</label>
+        <input
+          id="title-input"
+          name="title"
+          type="text"
+          placeholder="Add a new task or issue…"
+          maxlength="200"
+          required
+        />
+        <button type="submit">Add</button>
+      </form>
+
+      <p id="error-message" class="error" role="alert" hidden></p>
+
+      <section aria-labelledby="board-heading">
+        <h2 id="board-heading" class="sr-only">Board</h2>
+        <ul id="item-list" class="item-list"></ul>
+        <p id="empty-state" class="empty-state" hidden>No items yet. Add one above! 🎉</p>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span id="status-pill" class="status-pill" title="API health">checking…</span>
+      <span class="footer-note">Served by a zero-dependency Node HTTP server</span>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
