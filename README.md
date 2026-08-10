@@ -54,7 +54,7 @@ npm test
 ```
 
 Runs the built-in Node test runner (`node --test`) against the store
-and API.
+and API. The suite uses Node's built-in test runner with no external dependencies required.
 
 ## Syntax check
 
