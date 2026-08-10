@@ -29,6 +29,12 @@ npm start
 
 Then open http://localhost:3000
 
+To check the health endpoint:
+
+```bash
+curl http://localhost:3000/api/health
+```
+
 To use a different port:
 
 ```bash
