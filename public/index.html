@@ -29,6 +29,35 @@
 
       <p id="error-message" class="error" role="alert" hidden></p>
 
+      <section class="filters" aria-label="Filter items">
+        <div class="search-field">
+          <label for="search-input">Search</label>
+          <input
+            id="search-input"
+            name="search"
+            type="search"
+            placeholder="Search by title"
+            autocomplete="off"
+          />
+        </div>
+
+        <fieldset id="status-filter" class="status-filter">
+          <legend>Status</legend>
+          <label>
+            <input type="radio" name="status-filter" value="all" checked />
+            <span>All</span>
+          </label>
+          <label>
+            <input type="radio" name="status-filter" value="active" />
+            <span>Active</span>
+          </label>
+          <label>
+            <input type="radio" name="status-filter" value="completed" />
+            <span>Completed</span>
+          </label>
+        </fieldset>
+      </section>
+
       <section aria-labelledby="board-heading">
         <h2 id="board-heading" class="sr-only">Board</h2>
         <ul id="item-list" class="item-list"></ul>
@@ -42,6 +71,6 @@
     </footer>
   </div>
 
-  <script src="/app.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

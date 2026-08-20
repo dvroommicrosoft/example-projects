@@ -1,6 +1,13 @@
 // src/store.js
-// A tiny, dependency-free in-memory store for Tiny Triage items.
+// A tiny, dependency-free JSON-backed store for Tiny Triage items.
 // Kept intentionally small so agents can read and modify it quickly.
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+export const DEFAULT_DATA_FILE = path.join(MODULE_DIR, "..", "data", "items.json");
 
 /**
  * @typedef {Object} Item
@@ -11,13 +18,13 @@
  */
 
 /**
- * Creates a fresh, isolated store instance. Useful for tests so state
- * doesn't leak between test files, and used once at server startup
- * for the live in-memory data.
+ * Creates a fresh store instance. The optional filePath is useful for tests
+ * so state doesn't leak between test files.
  */
-export function createStore(seed = []) {
+export function createStore(seed = [], options = {}) {
+  const filePath = options.filePath || process.env.TRIAGE_DATA_FILE || DEFAULT_DATA_FILE;
   /** @type {Item[]} */
-  let items = seed.map((item) => ({ ...item }));
+  let items = loadItems(filePath, seed);
 
   // Start the id counter above any numeric-looking ids already present in
   // the seed data, so newly added items never collide with seeded ones.
@@ -50,26 +57,103 @@ export function createStore(seed = []) {
       done: false,
       createdAt: new Date().toISOString(),
     };
-    items.push(item);
+    const nextItems = [...items, item];
+    persist(nextItems, filePath);
+    items = nextItems;
     return item;
   }
 
   function toggle(id) {
     const item = get(id);
     if (!item) return undefined;
-    item.done = !item.done;
-    return item;
+    const nextItems = items.map((candidate) =>
+      candidate.id === id ? { ...candidate, done: !candidate.done } : candidate,
+    );
+    persist(nextItems, filePath);
+    items = nextItems;
+    return get(id);
   }
 
   function remove(id) {
-    const before = items.length;
-    items = items.filter((item) => item.id !== id);
-    return items.length < before;
+    const nextItems = items.filter((item) => item.id !== id);
+    if (nextItems.length === items.length) return false;
+    persist(nextItems, filePath);
+    items = nextItems;
+    return true;
   }
 
   function clear() {
+    persist([], filePath);
     items = [];
   }
 
   return { list, get, add, toggle, remove, clear };
+}
+
+function loadItems(filePath, seed) {
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return seed.map((item) => ({ ...item }));
+    throw storageError(`Unable to read persisted items from ${filePath}`, error);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw storageError(`Unable to parse persisted items from ${filePath}`, error);
+  }
+  if (!Array.isArray(parsed) || !hasValidItems(parsed)) {
+    throw new Error(`Invalid persisted items in ${filePath}`);
+  }
+  return parsed.map((item) => ({ ...item }));
+}
+
+function hasValidItems(items) {
+  const ids = new Set();
+  return items.every((item) => {
+    const valid =
+      item &&
+      typeof item === "object" &&
+      typeof item.id === "string" &&
+      item.id.length > 0 &&
+      typeof item.title === "string" &&
+      item.title.trim() === item.title &&
+      item.title.length > 0 &&
+      item.title.length <= 200 &&
+      typeof item.done === "boolean" &&
+      typeof item.createdAt === "string" &&
+      !Number.isNaN(Date.parse(item.createdAt)) &&
+      !ids.has(item.id);
+    if (valid) ids.add(item.id);
+    return valid;
+  });
+}
+
+function persist(items, filePath) {
+  const directory = path.dirname(filePath);
+  const temporaryPath = path.join(
+    directory,
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
+  );
+  try {
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(temporaryPath, `${JSON.stringify(items, null, 2)}\n`, "utf8");
+    fs.renameSync(temporaryPath, filePath);
+  } catch (error) {
+    try {
+      fs.rmSync(temporaryPath, { force: true });
+    } catch {
+      // Preserve the original storage error.
+    }
+    throw storageError(`Unable to persist items to ${filePath}`, error);
+  }
+}
+
+function storageError(message, cause) {
+  const error = new Error(message, { cause });
+  error.storage = true;
+  return error;
 }

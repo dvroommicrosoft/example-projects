@@ -38,14 +38,19 @@ function sendJson(res, statusCode, payload) {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
+    let bytes = 0;
+    let rejected = false;
     req.on("data", (chunk) => {
-      raw += chunk;
-      if (raw.length > 10_000) {
+      bytes += chunk.byteLength;
+      if (bytes > 10_000) {
+        rejected = true;
         reject(new Error("payload too large"));
-        req.destroy();
+        return;
       }
+      raw += chunk;
     });
     req.on("end", () => {
+      if (rejected) return;
       if (!raw) return resolve({});
       try {
         resolve(JSON.parse(raw));
@@ -60,8 +65,9 @@ function readBody(req) {
 function serveStatic(req, res, pathname) {
   const relPath = pathname === "/" ? "/index.html" : pathname;
   const filePath = path.normalize(path.join(PUBLIC_DIR, relPath));
+  const relativePath = path.relative(PUBLIC_DIR, filePath);
 
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     sendJson(res, 403, { error: "forbidden" });
     return;
   }
@@ -134,7 +140,7 @@ export function createApp(appStore = store) {
 
       sendJson(res, 405, { error: "method not allowed" });
     } catch (err) {
-      sendJson(res, 400, { error: err.message || "bad request" });
+      sendJson(res, err.storage ? 500 : 400, { error: err.message || "bad request" });
     }
   });
 }

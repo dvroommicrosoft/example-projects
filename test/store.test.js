@@ -1,13 +1,22 @@
 // test/store.test.js
-import { test, describe, beforeEach } from "node:test";
+import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createStore } from "../src/store.js";
 
 describe("store", () => {
   let store;
+  let tempDir;
 
   beforeEach(() => {
-    store = createStore();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "tiny-triage-"));
+    store = createStore([], { filePath: path.join(tempDir, "items.json") });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   test("starts empty", () => {
@@ -67,10 +76,56 @@ describe("store", () => {
     const seeded = createStore([
       { id: "1", title: "Seeded one", done: false, createdAt: new Date().toISOString() },
       { id: "2", title: "Seeded two", done: false, createdAt: new Date().toISOString() },
-    ]);
+    ], { filePath: path.join(tempDir, "seeded.json") });
     const item = seeded.add("New item");
     assert.notEqual(item.id, "1");
     assert.notEqual(item.id, "2");
     assert.equal(seeded.list().length, 3);
+  });
+
+  test("loads persisted items when a store is recreated", () => {
+    const item = store.add("Survives restart");
+    store.toggle(item.id);
+    const restarted = createStore([], { filePath: path.join(tempDir, "items.json") });
+    assert.deepEqual(restarted.list(), [{ ...item, done: true }]);
+  });
+
+  test("rejects malformed persisted data", () => {
+    fs.writeFileSync(path.join(tempDir, "items.json"), "{not json");
+    assert.throws(
+      () => createStore([], { filePath: path.join(tempDir, "items.json") }),
+      /Unable to parse persisted items/,
+    );
+  });
+
+  test("rejects persisted items that violate store invariants", () => {
+    fs.writeFileSync(
+      path.join(tempDir, "items.json"),
+      JSON.stringify([{ id: "1", title: "", done: false, createdAt: new Date().toISOString() }]),
+    );
+    assert.throws(
+      () => createStore([], { filePath: path.join(tempDir, "items.json") }),
+      /Invalid persisted items/,
+    );
+  });
+
+  test("rejects persisted items with an empty id", () => {
+    fs.writeFileSync(
+      path.join(tempDir, "items.json"),
+      JSON.stringify([{ id: "", title: "Unreachable", done: false, createdAt: new Date().toISOString() }]),
+    );
+    assert.throws(
+      () => createStore([], { filePath: path.join(tempDir, "items.json") }),
+      /Invalid persisted items/,
+    );
+  });
+
+  test("surfaces storage read failures", () => {
+    const blocker = path.join(tempDir, "blocker");
+    fs.writeFileSync(blocker, "not a directory");
+    assert.throws(
+      () => createStore([], { filePath: path.join(blocker, "items.json") }),
+      /Unable to read persisted items/,
+    );
   });
 });

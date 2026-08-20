@@ -1,6 +1,9 @@
 // test/api.test.js
 import { test, describe, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createApp } from "../server.js";
 import { createStore } from "../src/store.js";
 
@@ -8,9 +11,11 @@ describe("API", () => {
   let server;
   let baseUrl;
   let store;
+  let tempDir;
 
   before(async () => {
-    store = createStore();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "tiny-triage-api-"));
+    store = createStore([], { filePath: path.join(tempDir, "items.json") });
     server = createApp(store);
     await new Promise((resolve) => server.listen(0, resolve));
     const { port } = server.address();
@@ -19,6 +24,7 @@ describe("API", () => {
 
   after(async () => {
     await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   beforeEach(() => {
@@ -60,6 +66,16 @@ describe("API", () => {
     assert.equal(res.status, 400);
   });
 
+  test("POST /api/items rejects oversized payloads without dropping the connection", async () => {
+    const res = await fetch(`${baseUrl}/api/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "x".repeat(10_000) }),
+    });
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), { error: "payload too large" });
+  });
+
   test("PATCH /api/items/:id toggles done", async () => {
     const created = await (
       await fetch(`${baseUrl}/api/items`, {
@@ -95,6 +111,18 @@ describe("API", () => {
     const listRes = await fetch(`${baseUrl}/api/items`);
     const body = await listRes.json();
     assert.deepEqual(body.items, []);
+  });
+
+  test("a new app store sees items after a restart", async () => {
+    const created = await (
+      await fetch(`${baseUrl}/api/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Persist me" }),
+      })
+    ).json();
+    const restartedStore = createStore([], { filePath: path.join(tempDir, "items.json") });
+    assert.deepEqual(restartedStore.list(), [created.item]);
   });
 
   test("GET / serves the static HTML shell", async () => {
