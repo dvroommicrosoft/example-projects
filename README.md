@@ -13,6 +13,8 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 - List / add / toggle / remove triage items
 - In-memory store (resets on restart) with basic validation
 - JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
+- Activity reporting: `GET /api/reports` aggregates created/completed/reopened/deleted
+  events over a timeframe, with optional event-type filtering
 - Static UI served from `public/`
 - Configurable port via `PORT` env var (defaults to `3000`)
 
@@ -62,16 +64,17 @@ and API. The suite uses Node's built-in test runner with no external dependencie
 npm run check
 ```
 
-Runs `node --check` against the server and store modules (no linter
-dependency required).
+Runs `node --check` against the server, store, and reports modules (no
+linter dependency required).
 
 ## Project layout
 
 ```
 server.js        # HTTP server + routing + static file serving
-src/store.js      # In-memory item store (domain logic)
-public/           # Static front-end: index.html, style.css, app.js
-test/             # node:test suites for the store and the API
+src/store.js      # In-memory item store (domain logic + activity log)
+src/reports.js    # Aggregates activity into totals/day-buckets for reports
+public/           # Static front-end: index.html, style.css, app.js, reports.js
+test/             # node:test suites for the store, reports, and the API
 ```
 
 ## API reference
@@ -83,3 +86,24 @@ test/             # node:test suites for the store and the API
 | POST   | `/api/items`      | Add an item, body `{ "title": "..." }` |
 | PATCH  | `/api/items/:id`  | Toggle an item's `done` state   |
 | DELETE | `/api/items/:id`  | Remove an item                  |
+| GET    | `/api/reports`    | Activity report for a timeframe (see below) |
+
+### `GET /api/reports`
+
+Query params (all optional):
+
+- `from`, `to` — ISO 8601 timestamps bounding the range (default: last 7 days)
+- `type` — comma-separated subset of `created,completed,reopened,deleted` to
+  restrict the report to
+
+Response:
+
+```json
+{
+  "range": { "from": "...", "to": "..." },
+  "totals": { "created": 0, "completed": 0, "reopened": 0, "deleted": 0 },
+  "buckets": [
+    { "date": "YYYY-MM-DD", "created": 0, "completed": 0, "reopened": 0, "deleted": 0 }
+  ]
+}
+```

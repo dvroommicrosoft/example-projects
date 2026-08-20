@@ -73,4 +73,72 @@ describe("store", () => {
     assert.notEqual(item.id, "2");
     assert.equal(seeded.list().length, 3);
   });
+
+  test("add() records a created activity entry", () => {
+    const item = store.add("Track me");
+    const activity = store.getActivity();
+    assert.equal(activity.length, 1);
+    assert.equal(activity[0].type, "created");
+    assert.equal(activity[0].itemId, item.id);
+    assert.equal(activity[0].title, "Track me");
+    assert.ok(activity[0].at);
+  });
+
+  test("toggle() records completed then reopened activity entries", () => {
+    const item = store.add("Toggle me");
+    store.toggle(item.id);
+    store.toggle(item.id);
+    const activity = store.getActivity();
+    assert.deepEqual(
+      activity.map((entry) => entry.type),
+      ["created", "completed", "reopened"],
+    );
+  });
+
+  test("toggle() with unknown id does not record activity", () => {
+    store.toggle("nope");
+    assert.deepEqual(store.getActivity(), []);
+  });
+
+  test("remove() records a deleted activity entry", () => {
+    const item = store.add("Delete me");
+    store.remove(item.id);
+    const activity = store.getActivity();
+    assert.deepEqual(
+      activity.map((entry) => entry.type),
+      ["created", "deleted"],
+    );
+    assert.equal(activity[1].title, "Delete me");
+  });
+
+  test("remove() with unknown id does not record activity", () => {
+    store.remove("nope");
+    assert.deepEqual(store.getActivity(), []);
+  });
+
+  test("getActivity() filters by from/to range", () => {
+    const item = store.add("Item");
+    const activity = store.getActivity();
+    const at = activity[0].at;
+
+    assert.equal(store.getActivity({ from: at }).length, 1);
+    assert.equal(store.getActivity({ to: at }).length, 1);
+    assert.equal(store.getActivity({ from: "2999-01-01T00:00:00.000Z" }).length, 0);
+    assert.equal(store.getActivity({ to: "2000-01-01T00:00:00.000Z" }).length, 0);
+    void item;
+  });
+
+  test("getActivity() filters by itemId", () => {
+    const a = store.add("A");
+    const b = store.add("B");
+    assert.equal(store.getActivity({ itemId: a.id }).length, 1);
+    assert.equal(store.getActivity({ itemId: b.id }).length, 1);
+    assert.equal(store.getActivity({ itemId: "nope" }).length, 0);
+  });
+
+  test("clear() also clears the activity log", () => {
+    store.add("Item");
+    store.clear();
+    assert.deepEqual(store.getActivity(), []);
+  });
 });
