@@ -1,12 +1,23 @@
 // public/app.js
 // Vanilla JS front-end for Tiny Triage. No build step, no dependencies.
 
+import { buildReportsQuery, formatTotals } from "./reports.js";
+
 const listEl = document.getElementById("item-list");
 const emptyStateEl = document.getElementById("empty-state");
 const formEl = document.getElementById("add-form");
 const inputEl = document.getElementById("title-input");
 const errorEl = document.getElementById("error-message");
 const statusPillEl = document.getElementById("status-pill");
+const reportsFormEl = document.getElementById("reports-form");
+const reportsFromEl = document.getElementById("reports-from");
+const reportsToEl = document.getElementById("reports-to");
+const reportsTypeFilterEl = document.getElementById("reports-type-filter");
+const reportsErrorEl = document.getElementById("reports-error");
+const reportsTotalsEl = document.getElementById("reports-totals");
+const reportsTableEl = document.getElementById("reports-table");
+const reportsTableBodyEl = document.getElementById("reports-table-body");
+const reportsEmptyEl = document.getElementById("reports-empty");
 
 function showError(message) {
   errorEl.textContent = message;
@@ -115,5 +126,73 @@ formEl.addEventListener("submit", async (event) => {
   inputEl.focus();
 });
 
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getSelectedReportTypes() {
+  return Array.from(reportsTypeFilterEl.querySelectorAll('input[name="reports-type"]:checked')).map(
+    (input) => input.value,
+  );
+}
+
+function renderReportsTable(buckets) {
+  reportsTableBodyEl.innerHTML = "";
+  for (const bucket of buckets) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td>${bucket.date}</td><td>${bucket.created}</td><td>${bucket.completed}</td><td>${bucket.reopened}</td><td>${bucket.deleted}</td>`;
+    reportsTableBodyEl.append(row);
+  }
+  reportsTableEl.hidden = buckets.length === 0;
+  reportsEmptyEl.hidden = buckets.length > 0;
+}
+
+async function fetchReport() {
+  reportsErrorEl.hidden = true;
+  reportsErrorEl.textContent = "";
+
+  const types = getSelectedReportTypes();
+  const query = buildReportsQuery({
+    from: reportsFromEl.value,
+    to: reportsToEl.value,
+    types,
+  });
+
+  const res = await fetch(`/api/reports${query}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    reportsErrorEl.textContent = data.error || "Failed to generate report";
+    reportsErrorEl.hidden = false;
+    reportsTotalsEl.textContent = "";
+    renderReportsTable([]);
+    return;
+  }
+
+  const report = await res.json();
+  reportsTotalsEl.textContent = formatTotals(report.totals);
+  renderReportsTable(report.buckets);
+}
+
+function initReportsDefaults() {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  reportsToEl.value = toDateInputValue(now);
+  reportsFromEl.value = toDateInputValue(weekAgo);
+}
+
+reportsFormEl.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (getSelectedReportTypes().length === 0) {
+    reportsErrorEl.textContent = "Select at least one event type";
+    reportsErrorEl.hidden = false;
+    reportsTotalsEl.textContent = "";
+    renderReportsTable([]);
+    return;
+  }
+  fetchReport();
+});
+
 fetchItems();
 checkHealth();
+initReportsDefaults();
+fetchReport();

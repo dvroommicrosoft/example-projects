@@ -11,6 +11,15 @@
  */
 
 /**
+ * @typedef {Object} ActivityEntry
+ * @property {string} id
+ * @property {"created"|"completed"|"reopened"|"deleted"} type
+ * @property {string} itemId
+ * @property {string} title
+ * @property {string} at - ISO timestamp
+ */
+
+/**
  * Creates a fresh, isolated store instance. Useful for tests so state
  * doesn't leak between test files, and used once at server startup
  * for the live in-memory data.
@@ -27,6 +36,20 @@ export function createStore(seed = []) {
       const n = Number(item.id);
       return Number.isFinite(n) && n > max ? n : max;
     }, 0);
+
+  /** @type {ActivityEntry[]} */
+  let activity = [];
+  let nextActivityId = 1;
+
+  function recordActivity(type, item) {
+    activity.push({
+      id: String(nextActivityId++),
+      type,
+      itemId: item.id,
+      title: item.title,
+      at: new Date().toISOString(),
+    });
+  }
 
   function list() {
     return items.slice();
@@ -51,6 +74,7 @@ export function createStore(seed = []) {
       createdAt: new Date().toISOString(),
     };
     items.push(item);
+    recordActivity("created", item);
     return item;
   }
 
@@ -58,18 +82,43 @@ export function createStore(seed = []) {
     const item = get(id);
     if (!item) return undefined;
     item.done = !item.done;
+    recordActivity(item.done ? "completed" : "reopened", item);
     return item;
   }
 
   function remove(id) {
+    const item = get(id);
     const before = items.length;
-    items = items.filter((item) => item.id !== id);
-    return items.length < before;
+    items = items.filter((i) => i.id !== id);
+    const removed = items.length < before;
+    if (removed) {
+      recordActivity("deleted", item);
+    }
+    return removed;
   }
 
   function clear() {
     items = [];
+    activity = [];
   }
 
-  return { list, get, add, toggle, remove, clear };
+  /**
+   * Returns activity log entries within an optional [from, to] ISO timestamp
+   * range (inclusive), sorted chronologically. Omitted bounds are unbounded.
+   *
+   * @param {Object} [options]
+   * @param {string} [options.from] - ISO timestamp lower bound (inclusive).
+   * @param {string} [options.to] - ISO timestamp upper bound (inclusive).
+   * @param {string} [options.itemId] - Restrict to entries for this item.
+   */
+  function getActivity({ from, to, itemId } = {}) {
+    return activity
+      .filter((entry) => (from ? entry.at >= from : true))
+      .filter((entry) => (to ? entry.at <= to : true))
+      .filter((entry) => (itemId ? entry.itemId === itemId : true))
+      .slice()
+      .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  }
+
+  return { list, get, add, toggle, remove, clear, getActivity };
 }

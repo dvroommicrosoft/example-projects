@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./src/store.js";
+import { buildReport, EVENT_TYPES } from "./src/reports.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -85,6 +86,45 @@ export function createApp(appStore = store) {
     try {
       if (pathname === "/api/health" && req.method === "GET") {
         sendJson(res, 200, { status: "ok", uptime: process.uptime() });
+        return;
+      }
+
+      if (pathname === "/api/reports" && req.method === "GET") {
+        const now = new Date();
+        const defaultFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const fromParam = url.searchParams.get("from");
+        const toParam = url.searchParams.get("to");
+        const itemId = url.searchParams.get("itemId") || undefined;
+        const typeParam = url.searchParams.get("type");
+
+        const from = fromParam ? new Date(fromParam) : defaultFrom;
+        const to = toParam ? new Date(toParam) : now;
+
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+          sendJson(res, 400, { error: "from/to must be valid ISO 8601 timestamps" });
+          return;
+        }
+        if (from.getTime() > to.getTime()) {
+          sendJson(res, 400, { error: "from must not be after to" });
+          return;
+        }
+
+        let types;
+        if (typeParam) {
+          types = typeParam
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean);
+          const invalid = types.filter((t) => !EVENT_TYPES.includes(t));
+          if (invalid.length) {
+            sendJson(res, 400, { error: `type must be one of ${EVENT_TYPES.join(", ")}` });
+            return;
+          }
+        }
+
+        const entries = appStore.getActivity({ from: from.toISOString(), to: to.toISOString(), itemId });
+        const report = buildReport(entries, { types });
+        sendJson(res, 200, { range: { from: from.toISOString(), to: to.toISOString() }, ...report });
         return;
       }
 
