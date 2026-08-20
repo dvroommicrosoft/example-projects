@@ -1,12 +1,22 @@
 // public/app.js
 // Vanilla JS front-end for Tiny Triage. No build step, no dependencies.
 
+import { STATUS_FILTERS, filterItems, getEmptyStateMessage } from "./filter.js";
+
 const listEl = document.getElementById("item-list");
 const emptyStateEl = document.getElementById("empty-state");
 const formEl = document.getElementById("add-form");
 const inputEl = document.getElementById("title-input");
+const searchInputEl = document.getElementById("search-input");
+const statusFilterEl = document.getElementById("status-filter");
 const errorEl = document.getElementById("error-message");
 const statusPillEl = document.getElementById("status-pill");
+
+let items = [];
+const filters = {
+  query: "",
+  status: STATUS_FILTERS.all,
+};
 
 function showError(message) {
   errorEl.textContent = message;
@@ -20,7 +30,6 @@ function clearError() {
 
 function renderItems(items) {
   listEl.innerHTML = "";
-  emptyStateEl.hidden = items.length > 0;
 
   for (const item of items) {
     const li = document.createElement("li");
@@ -50,10 +59,18 @@ function renderItems(items) {
   }
 }
 
+function renderFilteredItems() {
+  const visibleItems = filterItems(items, filters);
+  renderItems(visibleItems);
+  emptyStateEl.textContent = getEmptyStateMessage(items, filters);
+  emptyStateEl.hidden = visibleItems.length > 0;
+}
+
 async function fetchItems() {
   const res = await fetch("/api/items");
   const data = await res.json();
-  renderItems(data.items || []);
+  items = data.items || [];
+  renderFilteredItems();
 }
 
 async function addItem(title) {
@@ -113,6 +130,20 @@ formEl.addEventListener("submit", async (event) => {
   await addItem(title);
   inputEl.value = "";
   inputEl.focus();
+});
+
+searchInputEl.addEventListener("input", () => {
+  filters.query = searchInputEl.value;
+  renderFilteredItems();
+});
+
+statusFilterEl.addEventListener("change", (event) => {
+  if (!event.target.matches('input[name="status-filter"]')) {
+    return;
+  }
+
+  filters.status = event.target.value;
+  renderFilteredItems();
 });
 
 fetchItems();

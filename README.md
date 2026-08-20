@@ -11,10 +11,16 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 ## Features
 
 - List / add / toggle / remove triage items
-- In-memory store (resets on restart) with basic validation
+- Durable local JSON store with basic validation
 - JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
 - Static UI served from `public/`
 - Configurable port via `PORT` env var (defaults to `3000`)
+
+Items are stored in `data/items.json` by default. The directory and file are
+created on the first mutation, and existing items are loaded when the server
+restarts. Set `TRIAGE_DATA_FILE` to use a different JSON file (for example,
+when running isolated test or development instances). Malformed persisted data
+and filesystem failures are reported instead of being silently ignored.
 
 ## Requirements
 
@@ -69,7 +75,8 @@ dependency required).
 
 ```
 server.js        # HTTP server + routing + static file serving
-src/store.js      # In-memory item store (domain logic)
+src/store.js      # Durable JSON-backed item store (domain logic)
+data/items.json   # Local persisted item data (created at runtime)
 public/           # Static front-end: index.html, style.css, app.js
 test/             # node:test suites for the store and the API
 ```
