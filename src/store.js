@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_DATA_FILE = path.join(MODULE_DIR, "..", "data", "items.json");
+export const DEFAULT_ACTIVITY_FILE = path.join(MODULE_DIR, "..", "data", "activity.json");
 
 /**
  * @typedef {Object} Item
@@ -18,13 +19,26 @@ export const DEFAULT_DATA_FILE = path.join(MODULE_DIR, "..", "data", "items.json
  */
 
 /**
- * Creates a fresh store instance. The optional filePath is useful for tests
- * so state doesn't leak between test files.
+ * @typedef {Object} ActivityEntry
+ * @property {string} id
+ * @property {string} itemId
+ * @property {string} title
+ * @property {"created"|"completed"|"reopened"|"deleted"} type
+ * @property {string} at - ISO timestamp
+ */
+
+/**
+ * Creates a fresh store instance. The optional filePath/activityFilePath are
+ * useful for tests so state doesn't leak between test files.
  */
 export function createStore(seed = [], options = {}) {
   const filePath = options.filePath || process.env.TRIAGE_DATA_FILE || DEFAULT_DATA_FILE;
+  const activityFilePath =
+    options.activityFilePath || process.env.TRIAGE_ACTIVITY_FILE || DEFAULT_ACTIVITY_FILE;
   /** @type {Item[]} */
   let items = loadItems(filePath, seed);
+  /** @type {ActivityEntry[]} */
+  let activity = loadActivity(activityFilePath);
 
   // Start the id counter above any numeric-looking ids already present in
   // the seed data, so newly added items never collide with seeded ones.
@@ -34,6 +48,34 @@ export function createStore(seed = [], options = {}) {
       const n = Number(item.id);
       return Number.isFinite(n) && n > max ? n : max;
     }, 0);
+
+  let nextActivityId =
+    1 +
+    activity.reduce((max, entry) => {
+      const n = Number(entry.id);
+      return Number.isFinite(n) && n > max ? n : max;
+    }, 0);
+
+  function recordActivity(type, item) {
+    const entry = {
+      id: String(nextActivityId++),
+      itemId: item.id,
+      title: item.title,
+      type,
+      at: new Date().toISOString(),
+    };
+    const nextActivity = [...activity, entry];
+    try {
+      persist(nextActivity, activityFilePath, "activity");
+      activity = nextActivity;
+    } catch (error) {
+      // The item mutation itself already succeeded and was persisted; a
+      // failure to record activity is logged but must not be surfaced as a
+      // failure of the (already-committed) item operation.
+      console.error(error);
+    }
+    return entry;
+  }
 
   function list() {
     return items.slice();
@@ -58,8 +100,9 @@ export function createStore(seed = [], options = {}) {
       createdAt: new Date().toISOString(),
     };
     const nextItems = [...items, item];
-    persist(nextItems, filePath);
+    persist(nextItems, filePath, "items");
     items = nextItems;
+    recordActivity("created", item);
     return item;
   }
 
@@ -69,25 +112,72 @@ export function createStore(seed = [], options = {}) {
     const nextItems = items.map((candidate) =>
       candidate.id === id ? { ...candidate, done: !candidate.done } : candidate,
     );
-    persist(nextItems, filePath);
+    persist(nextItems, filePath, "items");
     items = nextItems;
-    return get(id);
+    const updated = get(id);
+    recordActivity(updated.done ? "completed" : "reopened", updated);
+    return updated;
   }
 
   function remove(id) {
-    const nextItems = items.filter((item) => item.id !== id);
+    const item = get(id);
+    const nextItems = items.filter((candidate) => candidate.id !== id);
     if (nextItems.length === items.length) return false;
-    persist(nextItems, filePath);
+    persist(nextItems, filePath, "items");
     items = nextItems;
+    recordActivity("deleted", item);
     return true;
   }
 
   function clear() {
-    persist([], filePath);
+    persist([], filePath, "items");
     items = [];
+    try {
+      persist([], activityFilePath, "activity");
+    } catch (error) {
+      console.error(error);
+    }
+    activity = [];
   }
 
-  return { list, get, add, toggle, remove, clear };
+  /**
+   * Returns activity log entries within an optional [from, to] ISO timestamp
+   * range (inclusive), sorted chronologically. Omitted bounds are unbounded.
+   */
+  function getActivity({ from, to } = {}) {
+    const fromMs = from ? Date.parse(from) : -Infinity;
+    const toMs = to ? Date.parse(to) : Infinity;
+    return activity
+      .filter((entry) => {
+        const at = Date.parse(entry.at);
+        return at >= fromMs && at <= toMs;
+      })
+      .slice()
+      .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  }
+
+  return { list, get, add, toggle, remove, clear, getActivity };
+}
+
+function loadActivity(filePath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw storageError(`Unable to read persisted activity from ${filePath}`, error);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw storageError(`Unable to parse persisted activity from ${filePath}`, error);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Invalid persisted activity in ${filePath}`);
+  }
+  return parsed.map((entry) => ({ ...entry }));
 }
 
 function loadItems(filePath, seed) {
@@ -132,7 +222,7 @@ function hasValidItems(items) {
   });
 }
 
-function persist(items, filePath) {
+function persist(items, filePath, entityName = "items") {
   const directory = path.dirname(filePath);
   const temporaryPath = path.join(
     directory,
@@ -148,7 +238,7 @@ function persist(items, filePath) {
     } catch {
       // Preserve the original storage error.
     }
-    throw storageError(`Unable to persist items to ${filePath}`, error);
+    throw storageError(`Unable to persist ${entityName} to ${filePath}`, error);
   }
 }
 

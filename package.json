@@ -9,7 +9,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check src/store.js && node --check public/app.js && node --check public/filter.js"
+    "check": "node --check server.js && node --check src/store.js && node --check src/reports.js && node --check public/app.js && node --check public/filter.js && node --check public/counts.js && node --check public/shortcuts.js"
   },
   "engines": {
     "node": ">=18"

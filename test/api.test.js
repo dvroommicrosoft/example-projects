@@ -15,7 +15,7 @@ describe("API", () => {
 
   before(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "tiny-triage-api-"));
-    store = createStore([], { filePath: path.join(tempDir, "items.json") });
+    store = createStore([], { filePath: path.join(tempDir, "items.json"), activityFilePath: path.join(tempDir, "activity.json") });
     server = createApp(store);
     await new Promise((resolve) => server.listen(0, resolve));
     const { port } = server.address();
@@ -121,7 +121,7 @@ describe("API", () => {
         body: JSON.stringify({ title: "Persist me" }),
       })
     ).json();
-    const restartedStore = createStore([], { filePath: path.join(tempDir, "items.json") });
+    const restartedStore = createStore([], { filePath: path.join(tempDir, "items.json"), activityFilePath: path.join(tempDir, "activity.json") });
     assert.deepEqual(restartedStore.list(), [created.item]);
   });
 
@@ -130,5 +130,51 @@ describe("API", () => {
     assert.equal(res.status, 200);
     const text = await res.text();
     assert.match(text, /Tiny Triage/);
+    assert.match(text, /id="item-counts"/);
+  });
+
+  test("GET /api/reports defaults to the last 7 days and empty totals", async () => {
+    const res = await fetch(`${baseUrl}/api/reports`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.deepEqual(body.totals, { created: 0, completed: 0, reopened: 0, deleted: 0 });
+    assert.deepEqual(body.buckets, []);
+    assert.ok(body.range.from);
+    assert.ok(body.range.to);
+  });
+
+  test("GET /api/reports reflects activity within an explicit range", async () => {
+    const created = await (
+      await fetch(`${baseUrl}/api/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Reportable" }),
+      })
+    ).json();
+    await fetch(`${baseUrl}/api/items/${created.item.id}`, { method: "PATCH" });
+
+    const from = new Date(Date.now() - 60_000).toISOString();
+    const to = new Date(Date.now() + 60_000).toISOString();
+    const res = await fetch(`${baseUrl}/api/reports?from=${from}&to=${to}`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.totals.created, 1);
+    assert.equal(body.totals.completed, 1);
+  });
+
+  test("GET /api/reports rejects an invalid from/to timestamp", async () => {
+    const res = await fetch(`${baseUrl}/api/reports?from=not-a-date`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /valid ISO 8601/);
+  });
+
+  test("GET /api/reports rejects a range where from is after to", async () => {
+    const from = new Date().toISOString();
+    const to = new Date(Date.now() - 60_000).toISOString();
+    const res = await fetch(`${baseUrl}/api/reports?from=${from}&to=${to}`);
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /from must not be after to/);
   });
 });

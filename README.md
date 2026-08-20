@@ -12,8 +12,14 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 
 - List / add / toggle / remove triage items
 - Durable local JSON store with basic validation
-- JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
+- JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`, `GET /api/reports`
+- Activity reporting: an append-only activity log records item creation,
+  completion, reopening, and deletion, queryable as a report over any
+  timeframe
 - Static UI served from `public/`
+- Keyboard shortcuts with an on-screen reference: <kbd>N</kbd> focuses the new
+  item field, <kbd>/</kbd> focuses search, and <kbd>Escape</kbd> leaves the
+  current field
 - Configurable port via `PORT` env var (defaults to `3000`)
 
 Items are stored in `data/items.json` by default. The directory and file are
@@ -21,6 +27,10 @@ created on the first mutation, and existing items are loaded when the server
 restarts. Set `TRIAGE_DATA_FILE` to use a different JSON file (for example,
 when running isolated test or development instances). Malformed persisted data
 and filesystem failures are reported instead of being silently ignored.
+
+Every create, complete, reopen, and delete is also appended to an activity
+log at `data/activity.json` (override with `TRIAGE_ACTIVITY_FILE`), which
+powers the `/api/reports` endpoint below.
 
 ## Requirements
 
@@ -76,9 +86,11 @@ dependency required).
 ```
 server.js        # HTTP server + routing + static file serving
 src/store.js      # Durable JSON-backed item store (domain logic)
+src/reports.js    # Activity report aggregation (counts + daily buckets)
 data/items.json   # Local persisted item data (created at runtime)
-public/           # Static front-end: index.html, style.css, app.js
-test/             # node:test suites for the store and the API
+data/activity.json # Local persisted activity log (created at runtime)
+public/           # Static front-end: index.html, style.css, app.js, shortcuts.js
+test/             # node:test suites for the store, reports, and the API
 ```
 
 ## API reference
@@ -90,3 +102,8 @@ test/             # node:test suites for the store and the API
 | POST   | `/api/items`      | Add an item, body `{ "title": "..." }` |
 | PATCH  | `/api/items/:id`  | Toggle an item's `done` state   |
 | DELETE | `/api/items/:id`  | Remove an item                  |
+| GET    | `/api/reports`    | Activity report over a timeframe, query params `from`/`to` (ISO 8601, default: last 7 days) |
+
+`GET /api/reports` responds with `{ range: { from, to }, totals: { created, completed, reopened, deleted }, buckets: [{ date, created, completed, reopened, deleted }, ...] }`,
+where `buckets` groups activity by UTC day within the requested range.
+

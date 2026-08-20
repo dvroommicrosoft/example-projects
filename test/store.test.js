@@ -12,7 +12,7 @@ describe("store", () => {
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "tiny-triage-"));
-    store = createStore([], { filePath: path.join(tempDir, "items.json") });
+    store = createStore([], { filePath: path.join(tempDir, "items.json"), activityFilePath: path.join(tempDir, "activity.json") });
   });
 
   afterEach(() => {
@@ -65,6 +65,68 @@ describe("store", () => {
     assert.equal(store.remove("nope"), false);
   });
 
+  test("add() records a created activity entry", () => {
+    const item = store.add("Track me");
+    const entries = store.getActivity();
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].type, "created");
+    assert.equal(entries[0].itemId, item.id);
+    assert.equal(entries[0].title, "Track me");
+    assert.ok(entries[0].at);
+  });
+
+  test("toggle() records completed then reopened activity entries", () => {
+    const item = store.add("Toggle me");
+    store.toggle(item.id);
+    store.toggle(item.id);
+    const types = store.getActivity().map((entry) => entry.type);
+    assert.deepEqual(types, ["created", "completed", "reopened"]);
+  });
+
+  test("toggle() with unknown id does not record activity", () => {
+    store.toggle("nope");
+    assert.deepEqual(store.getActivity(), []);
+  });
+
+  test("remove() records a deleted activity entry", () => {
+    const item = store.add("Remove me");
+    store.remove(item.id);
+    const types = store.getActivity().map((entry) => entry.type);
+    assert.deepEqual(types, ["created", "deleted"]);
+  });
+
+  test("getActivity() filters by from/to range", () => {
+    const item = store.add("Ranged");
+    const entries = store.getActivity();
+    const createdAt = entries[0].at;
+    const before = new Date(Date.parse(createdAt) - 1000).toISOString();
+    const after = new Date(Date.parse(createdAt) + 1000).toISOString();
+
+    assert.equal(store.getActivity({ from: before, to: after }).length, 1);
+    assert.equal(store.getActivity({ from: after }).length, 0);
+    assert.equal(store.getActivity({ to: before }).length, 0);
+    void item;
+  });
+
+  test("clear() also clears the activity log", () => {
+    store.add("Will be cleared");
+    store.clear();
+    assert.deepEqual(store.getActivity(), []);
+  });
+
+  test("add() still succeeds and commits the item even if the activity log write fails", () => {
+    const activityDir = path.join(tempDir, "unwritable-activity-dir");
+    const badStore = createStore([], {
+      filePath: path.join(tempDir, "protected-items.json"),
+      activityFilePath: path.join(activityDir, "activity.json"),
+    });
+    // Make the activity log's directory a file, so writes to it fail.
+    fs.writeFileSync(activityDir, "not a directory");
+    const item = badStore.add("Survives activity failure");
+    assert.equal(item.title, "Survives activity failure");
+    assert.equal(badStore.list().length, 1);
+  });
+
   test("list() returns a copy, not a live reference", () => {
     store.add("Item one");
     const items = store.list();
@@ -86,14 +148,14 @@ describe("store", () => {
   test("loads persisted items when a store is recreated", () => {
     const item = store.add("Survives restart");
     store.toggle(item.id);
-    const restarted = createStore([], { filePath: path.join(tempDir, "items.json") });
+    const restarted = createStore([], { filePath: path.join(tempDir, "items.json"), activityFilePath: path.join(tempDir, "activity.json") });
     assert.deepEqual(restarted.list(), [{ ...item, done: true }]);
   });
 
   test("rejects malformed persisted data", () => {
     fs.writeFileSync(path.join(tempDir, "items.json"), "{not json");
     assert.throws(
-      () => createStore([], { filePath: path.join(tempDir, "items.json") }),
+      () => createStore([], { filePath: path.join(tempDir, "items.json"), activityFilePath: path.join(tempDir, "activity.json") }),
       /Unable to parse persisted items/,
     );
   });
@@ -104,7 +166,7 @@ describe("store", () => {
       JSON.stringify([{ id: "1", title: "", done: false, createdAt: new Date().toISOString() }]),
     );
     assert.throws(
-      () => createStore([], { filePath: path.join(tempDir, "items.json") }),
+      () => createStore([], { filePath: path.join(tempDir, "items.json"), activityFilePath: path.join(tempDir, "activity.json") }),
       /Invalid persisted items/,
     );
   });
@@ -115,7 +177,7 @@ describe("store", () => {
       JSON.stringify([{ id: "", title: "Unreachable", done: false, createdAt: new Date().toISOString() }]),
     );
     assert.throws(
-      () => createStore([], { filePath: path.join(tempDir, "items.json") }),
+      () => createStore([], { filePath: path.join(tempDir, "items.json"), activityFilePath: path.join(tempDir, "activity.json") }),
       /Invalid persisted items/,
     );
   });
@@ -124,7 +186,7 @@ describe("store", () => {
     const blocker = path.join(tempDir, "blocker");
     fs.writeFileSync(blocker, "not a directory");
     assert.throws(
-      () => createStore([], { filePath: path.join(blocker, "items.json") }),
+      () => createStore([], { filePath: path.join(blocker, "items.json"), activityFilePath: path.join(tempDir, "activity.json") }),
       /Unable to read persisted items/,
     );
   });
