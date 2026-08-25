@@ -2,13 +2,19 @@
 // Vanilla JS front-end for Tiny Triage. No build step, no dependencies.
 
 import { buildReportsQuery, formatTotals } from "./reports.js";
+import { applyHealthView, createHealthMonitor } from "./health-status.js";
 
 const listEl = document.getElementById("item-list");
 const emptyStateEl = document.getElementById("empty-state");
 const formEl = document.getElementById("add-form");
 const inputEl = document.getElementById("title-input");
 const errorEl = document.getElementById("error-message");
-const statusPillEl = document.getElementById("status-pill");
+const healthElements = {
+  banner: document.getElementById("api-health"),
+  label: document.getElementById("api-health-label"),
+  detail: document.getElementById("api-health-detail"),
+  retry: document.getElementById("api-health-retry"),
+};
 const reportsFormEl = document.getElementById("reports-form");
 const reportsFromEl = document.getElementById("reports-from");
 const reportsToEl = document.getElementById("reports-to");
@@ -102,20 +108,29 @@ async function removeItem(id) {
   await fetchItems();
 }
 
-async function checkHealth() {
-  try {
-    const res = await fetch("/api/health");
-    if (res.ok) {
-      statusPillEl.textContent = "API: healthy";
-      statusPillEl.className = "status-pill ok";
-    } else {
-      throw new Error("unhealthy");
+const healthMonitor = createHealthMonitor({
+  fetchFn: fetch,
+  onChange: (view) => {
+    if (view.retryHidden && document.activeElement === healthElements.retry) {
+      healthElements.banner.focus();
     }
-  } catch {
-    statusPillEl.textContent = "API: unreachable";
-    statusPillEl.className = "status-pill down";
+    applyHealthView(healthElements, view);
+  },
+});
+
+healthElements.retry.addEventListener("click", () => {
+  void healthMonitor.checkNow({ showChecking: true });
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    healthMonitor.stop();
+  } else {
+    healthMonitor.start();
   }
-}
+});
+
+window.addEventListener("pagehide", () => healthMonitor.stop());
 
 formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -196,6 +211,6 @@ reportsFormEl.addEventListener("submit", (event) => {
 });
 
 fetchItems();
-checkHealth();
+if (!document.hidden) healthMonitor.start();
 initReportsDefaults();
 fetchReport();

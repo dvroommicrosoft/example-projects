@@ -13,6 +13,7 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 - List / add / toggle / remove triage items
 - In-memory store (resets on restart) with basic validation
 - JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
+- Live, accessible API health banner that refreshes without reloading
 - Activity reporting: `GET /api/reports` aggregates created/completed/reopened/deleted
   events over a timeframe, with optional event-type filtering
 - Static UI served from `public/`
@@ -73,7 +74,7 @@ linter dependency required).
 server.js        # HTTP server + routing + static file serving
 src/store.js      # In-memory item store (domain logic + activity log)
 src/reports.js    # Aggregates activity into totals/day-buckets for reports
-public/           # Static front-end: index.html, style.css, app.js, reports.js
+public/           # Static front-end, including health-status.js and reports.js
 test/             # node:test suites for the store, reports, and the API
 ```
 
