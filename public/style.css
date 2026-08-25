@@ -36,8 +36,97 @@ body {
 }
 
 .subtitle {
-  margin: 0 0 1.75rem;
+  margin: 0 0 1rem;
   color: var(--muted);
+}
+
+.api-health {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #334155;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.api-health-status {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.api-health-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.api-health-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.api-health-copy strong {
+  font-size: 0.9rem;
+}
+
+.api-health-copy span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.api-health.reachable {
+  border-color: var(--done);
+}
+
+.api-health.reachable .api-health-dot {
+  background: var(--done);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.13);
+}
+
+.api-health.reachable .api-health-copy strong {
+  color: var(--done);
+}
+
+.api-health.unreachable {
+  border-color: var(--danger);
+}
+
+.api-health.unreachable .api-health-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.13);
+}
+
+.api-health.unreachable .api-health-copy strong {
+  color: #fecaca;
+}
+
+.api-health-retry {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.api-health-retry:hover {
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.api-health-retry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .add-form {
@@ -162,23 +251,6 @@ body {
   color: var(--muted);
 }
 
-.status-pill {
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  background: var(--panel);
-  border: 1px solid #334155;
-}
-
-.status-pill.ok {
-  color: var(--done);
-  border-color: var(--done);
-}
-
-.status-pill.down {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -251,4 +323,10 @@ body {
   text-align: left;
   padding: 0.4rem 0.6rem;
   border-bottom: 1px solid var(--panel-2);
+}
+
+@media (max-width: 420px) {
+  .api-health {
+    align-items: flex-start;
+  }
 }
