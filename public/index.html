@@ -42,10 +42,19 @@
           maxlength="200"
           required
         />
+        <div class="priority-field">
+          <label for="priority-input">Priority</label>
+          <select id="priority-input" name="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
         <button type="submit">Add</button>
       </form>
 
       <p id="error-message" class="error" role="alert" hidden></p>
+      <p id="priority-status" class="sr-only" role="status" aria-live="polite"></p>
 
       <section aria-labelledby="board-heading">
         <h2 id="board-heading" class="sr-only">Board</h2>

@@ -7,8 +7,18 @@
  * @property {string} id
  * @property {string} title
  * @property {boolean} done
+ * @property {"low"|"medium"|"high"} priority
  * @property {string} createdAt - ISO timestamp
  */
+
+export const PRIORITIES = ["low", "medium", "high"];
+
+function validatePriority(priority) {
+  if (!PRIORITIES.includes(priority)) {
+    throw new Error(`priority must be one of ${PRIORITIES.join(", ")}`);
+  }
+  return priority;
+}
 
 /**
  * @typedef {Object} ActivityEntry
@@ -26,7 +36,10 @@
  */
 export function createStore(seed = []) {
   /** @type {Item[]} */
-  let items = seed.map((item) => ({ ...item }));
+  let items = seed.map((item) => ({
+    ...item,
+    priority: item.priority === undefined ? "medium" : validatePriority(item.priority),
+  }));
 
   // Start the id counter above any numeric-looking ids already present in
   // the seed data, so newly added items never collide with seeded ones.
@@ -59,7 +72,7 @@ export function createStore(seed = []) {
     return items.find((item) => item.id === id);
   }
 
-  function add(title) {
+  function add(title, priority = "medium") {
     const trimmed = typeof title === "string" ? title.trim() : "";
     if (!trimmed) {
       throw new Error("title is required");
@@ -67,10 +80,12 @@ export function createStore(seed = []) {
     if (trimmed.length > 200) {
       throw new Error("title must be 200 characters or fewer");
     }
+    const validatedPriority = validatePriority(priority);
     const item = {
       id: String(nextId++),
       title: trimmed,
       done: false,
+      priority: validatedPriority,
       createdAt: new Date().toISOString(),
     };
     items.push(item);
@@ -83,6 +98,14 @@ export function createStore(seed = []) {
     if (!item) return undefined;
     item.done = !item.done;
     recordActivity(item.done ? "completed" : "reopened", item);
+    return item;
+  }
+
+  function setPriority(id, priority) {
+    const validatedPriority = validatePriority(priority);
+    const item = get(id);
+    if (!item) return undefined;
+    item.priority = validatedPriority;
     return item;
   }
 
@@ -120,5 +143,5 @@ export function createStore(seed = []) {
       .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   }
 
-  return { list, get, add, toggle, remove, clear, getActivity };
+  return { list, get, add, toggle, setPriority, remove, clear, getActivity };
 }

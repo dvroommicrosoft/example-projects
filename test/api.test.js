@@ -49,6 +49,29 @@ describe("API", () => {
     const body = await res.json();
     assert.equal(body.item.title, "Review PR");
     assert.equal(body.item.done, false);
+    assert.equal(body.item.priority, "medium");
+  });
+
+  test("POST /api/items accepts each priority", async () => {
+    for (const priority of ["low", "medium", "high"]) {
+      const res = await fetch(`${baseUrl}/api/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: priority, priority }),
+      });
+      assert.equal(res.status, 201);
+      assert.equal((await res.json()).item.priority, priority);
+    }
+  });
+
+  test("POST /api/items rejects invalid priority without adding an item", async () => {
+    const res = await fetch(`${baseUrl}/api/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Invalid", priority: "urgent" }),
+    });
+    assert.equal(res.status, 400);
+    assert.deepEqual(store.list(), []);
   });
 
   test("POST /api/items rejects blank title", async () => {
@@ -73,6 +96,46 @@ describe("API", () => {
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.item.done, true);
+  });
+
+  test("PATCH /api/items/:id with an empty object still toggles done", async () => {
+    const item = store.add("Legacy toggle");
+    const res = await fetch(`${baseUrl}/api/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).item.done, true);
+  });
+
+  test("PATCH /api/items/:id updates priority without toggling or report activity", async () => {
+    const item = store.add("Prioritize", "low");
+    const activityBefore = store.getActivity();
+    const res = await fetch(`${baseUrl}/api/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ priority: "high" }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.item.priority, "high");
+    assert.equal(body.item.done, false);
+    assert.deepEqual(store.getActivity(), activityBefore);
+  });
+
+  test("PATCH /api/items/:id rejects invalid and unsupported bodies without mutation", async () => {
+    const item = store.add("Keep stable", "low");
+    for (const body of [{ priority: "urgent" }, { done: true }, { priority: "high", done: true }]) {
+      const res = await fetch(`${baseUrl}/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      assert.equal(res.status, 400);
+      assert.equal(store.get(item.id).priority, "low");
+      assert.equal(store.get(item.id).done, false);
+    }
   });
 
   test("PATCH /api/items/:id for unknown id returns 404", async () => {

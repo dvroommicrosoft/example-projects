@@ -3,12 +3,15 @@
 
 import { buildReportsQuery, formatTotals } from "./reports.js";
 import { applyHealthView, createHealthMonitor } from "./health-status.js";
+import { addItemRequest, createPriorityUpdater, setItemPriority } from "./items.js";
 
 const listEl = document.getElementById("item-list");
 const emptyStateEl = document.getElementById("empty-state");
 const formEl = document.getElementById("add-form");
 const inputEl = document.getElementById("title-input");
+const priorityEl = document.getElementById("priority-input");
 const errorEl = document.getElementById("error-message");
+const priorityStatusEl = document.getElementById("priority-status");
 const healthElements = {
   banner: document.getElementById("api-health"),
   label: document.getElementById("api-health-label"),
@@ -55,6 +58,42 @@ function renderItems(items) {
     title.className = "item-title";
     title.textContent = item.title;
 
+    const priority = document.createElement("select");
+    priority.id = `priority-${item.id}`;
+    priority.className = `item-priority priority-${item.priority}`;
+    priority.setAttribute("aria-label", `Priority for "${item.title}"`);
+    for (const value of ["low", "medium", "high"]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value[0].toUpperCase() + value.slice(1);
+      option.selected = value === item.priority;
+      priority.append(option);
+    }
+    const priorityUpdater = createPriorityUpdater({
+      initialPriority: item.priority,
+      save: (value) => setItemPriority(fetch, item.id, value),
+      onConfirmed: (updated, isLatest) => {
+        item.priority = updated.priority;
+        if (isLatest) {
+          priority.value = updated.priority;
+          priority.className = `item-priority priority-${updated.priority}`;
+        }
+        priorityStatusEl.textContent = `Priority for "${item.title}" changed to ${updated.priority}`;
+      },
+      onRejected: (error, confirmed, shouldRestore) => {
+        if (shouldRestore) {
+          priority.value = confirmed;
+          priority.className = `item-priority priority-${confirmed}`;
+        }
+        showError(error.message);
+      },
+    });
+    priority.addEventListener("change", () => {
+      clearError();
+      priority.className = `item-priority priority-${priority.value}`;
+      void priorityUpdater.change(priority.value);
+    });
+
     const removeBtn = document.createElement("button");
     removeBtn.className = "item-remove";
     removeBtn.type = "button";
@@ -62,7 +101,7 @@ function renderItems(items) {
     removeBtn.setAttribute("aria-label", `Remove "${item.title}"`);
     removeBtn.addEventListener("click", () => removeItem(item.id));
 
-    li.append(checkbox, title, removeBtn);
+    li.append(checkbox, title, priority, removeBtn);
     listEl.append(li);
   }
 }
@@ -73,19 +112,16 @@ async function fetchItems() {
   renderItems(data.items || []);
 }
 
-async function addItem(title) {
+async function addItem(title, priority) {
   clearError();
-  const res = await fetch("/api/items", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    showError(data.error || "Failed to add item");
-    return;
+  try {
+    await addItemRequest(fetch, title, priority);
+    await fetchItems();
+    return true;
+  } catch (error) {
+    showError(error.message);
+    return false;
   }
-  await fetchItems();
 }
 
 async function toggleItem(id) {
@@ -136,8 +172,11 @@ formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   const title = inputEl.value.trim();
   if (!title) return;
-  await addItem(title);
-  inputEl.value = "";
+  const added = await addItem(title, priorityEl.value);
+  if (added) {
+    inputEl.value = "";
+    priorityEl.value = "medium";
+  }
   inputEl.focus();
 });
 

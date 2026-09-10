@@ -131,12 +131,15 @@ body {
 
 .add-form {
   display: flex;
+  align-items: end;
+  flex-wrap: wrap;
   gap: 0.6rem;
   margin-bottom: 1rem;
 }
 
 .add-form input {
   flex: 1;
+  min-width: 14rem;
   padding: 0.7rem 0.9rem;
   border-radius: var(--radius);
   border: 1px solid #334155;
@@ -145,9 +148,37 @@ body {
   font-size: 1rem;
 }
 
-.add-form input:focus {
+.add-form input:focus,
+.add-form select:focus-visible,
+.item-priority:focus-visible,
+.item-toggle:focus-visible,
+.item-remove:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.priority-field {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.priority-field label {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.priority-field select,
+.item-priority {
+  border: 1px solid #475569;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+
+.priority-field select {
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
 }
 
 .add-form button {
@@ -190,6 +221,7 @@ body {
 
 .item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   background: var(--panel);
@@ -218,7 +250,26 @@ body {
 
 .item-title {
   flex: 1;
+  min-width: 10rem;
   word-break: break-word;
+}
+
+.item-priority {
+  padding: 0.35rem 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.item-priority.priority-low {
+  border-color: #64748b;
+}
+
+.item-priority.priority-medium {
+  border-color: var(--accent);
+}
+
+.item-priority.priority-high {
+  border-color: #fb923c;
 }
 
 .item-remove {
@@ -328,5 +379,12 @@ body {
 @media (max-width: 420px) {
   .api-health {
     align-items: flex-start;
+  }
+
+  .add-form input,
+  .priority-field,
+  .priority-field select,
+  .add-form button {
+    width: 100%;
   }
 }
