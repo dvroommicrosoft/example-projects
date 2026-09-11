@@ -4,6 +4,7 @@ import {
   addItemRequest,
   countItemsByStatus,
   createPriorityUpdater,
+  describeItemsSummary,
   filterItems,
   listItemsRequest,
   setItemPriority,
@@ -35,6 +36,17 @@ describe("item filters", () => {
 
   test("counts statuses from the full item list", () => {
     assert.deepEqual(countItemsByStatus(items), { all: 3, open: 2, done: 1 });
+  });
+
+  test("keeps an initial load failure visible during local filter renders", () => {
+    assert.equal(
+      describeItemsSummary({ loaded: false, failed: true, visible: 0, total: 0 }),
+      "Unable to load items",
+    );
+    assert.equal(
+      describeItemsSummary({ loaded: false, failed: false, visible: 0, total: 0 }),
+      "Loading items…",
+    );
   });
 });
 

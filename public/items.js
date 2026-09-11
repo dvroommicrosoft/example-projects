@@ -42,6 +42,11 @@ export function countItemsByStatus(items) {
   return { all: items.length, open: items.length - done, done };
 }
 
+export function describeItemsSummary({ loaded, failed, visible, total }) {
+  if (loaded) return `Showing ${visible} of ${total} items`;
+  return failed ? "Unable to load items" : "Loading items…";
+}
+
 export async function addItemRequest(fetchFn, title, priority) {
   const response = await fetchFn("/api/items", {
     method: "POST",

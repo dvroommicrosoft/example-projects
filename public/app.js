@@ -7,6 +7,7 @@ import {
   addItemRequest,
   countItemsByStatus,
   createPriorityUpdater,
+  describeItemsSummary,
   filterItems,
   listItemsRequest,
   setItemPriority,
@@ -43,6 +44,7 @@ const reportsEmptyEl = document.getElementById("reports-empty");
 let items = [];
 let selectedStatus = "all";
 let itemsLoaded = false;
+let itemsLoadFailed = false;
 const priorityUpdaters = new Map();
 
 function showError(message) {
@@ -95,9 +97,12 @@ function renderItems({ focusItemId, focusSelector } = {}) {
   listEl.innerHTML = "";
   emptyStateEl.hidden = !itemsLoaded || items.length > 0;
   noMatchStateEl.hidden = !itemsLoaded || items.length === 0 || visibleItems.length > 0;
-  itemsSummaryEl.textContent = itemsLoaded
-    ? `Showing ${visibleItems.length} of ${items.length} items`
-    : "Loading items…";
+  itemsSummaryEl.textContent = describeItemsSummary({
+    loaded: itemsLoaded,
+    failed: itemsLoadFailed,
+    visible: visibleItems.length,
+    total: items.length,
+  });
   clearFiltersEl.disabled = searchEl.value.length === 0 && selectedStatus === "all";
 
   for (const button of statusFilterEls) {
@@ -171,15 +176,17 @@ async function fetchItems(focus = {}) {
     const nextItems = await listItemsRequest(fetch);
     items = nextItems;
     itemsLoaded = true;
+    itemsLoadFailed = false;
+    const itemIds = new Set(items.map(({ id }) => id));
+    for (const id of priorityUpdaters.keys()) {
+      if (!itemIds.has(id)) priorityUpdaters.delete(id);
+    }
     renderItems(focus);
     return true;
   } catch (error) {
     showError(error.message);
-    if (itemsLoaded) {
-      renderItems(focus);
-    } else {
-      itemsSummaryEl.textContent = "Unable to load items";
-    }
+    itemsLoadFailed = true;
+    renderItems(itemsLoaded ? focus : {});
     return false;
   }
 }
