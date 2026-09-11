@@ -287,7 +287,8 @@ body {
 }
 
 .status-filters button {
-  padding: 0.35rem 0.5rem;
+  min-height: 32px;
+  padding: 0.4rem 0.6rem;
 }
 
 .status-filters button[aria-pressed="true"] {
@@ -301,7 +302,8 @@ body {
 }
 
 .clear-filters {
-  padding: 0.55rem 0.25rem;
+  min-height: 32px;
+  padding: 0.4rem 0.5rem;
   color: var(--accent);
 }
 

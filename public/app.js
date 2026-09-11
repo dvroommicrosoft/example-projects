@@ -43,6 +43,7 @@ const reportsEmptyEl = document.getElementById("reports-empty");
 let items = [];
 let selectedStatus = "all";
 let itemsLoaded = false;
+const priorityUpdaters = new Map();
 
 function showError(message) {
   errorEl.textContent = message;
@@ -52,6 +53,40 @@ function showError(message) {
 function clearError() {
   errorEl.hidden = true;
   errorEl.textContent = "";
+}
+
+function findPriorityControl(itemId) {
+  const row = Array.from(listEl.children).find((element) => element.dataset.id === itemId);
+  return row?.querySelector(".item-priority");
+}
+
+function updatePriorityControl(itemId, priority) {
+  const control = findPriorityControl(itemId);
+  if (!control) return;
+  control.value = priority;
+  control.className = `item-priority priority-${priority}`;
+}
+
+function getPriorityUpdater(item) {
+  let updater = priorityUpdaters.get(item.id);
+  if (updater) return updater;
+
+  updater = createPriorityUpdater({
+    initialPriority: item.priority,
+    save: (value) => setItemPriority(fetch, item.id, value),
+    onConfirmed: (updated, isLatest) => {
+      const currentItem = items.find(({ id }) => id === item.id);
+      if (currentItem) currentItem.priority = updated.priority;
+      if (isLatest) updatePriorityControl(item.id, updated.priority);
+      priorityStatusEl.textContent = `Priority for "${item.title}" changed to ${updated.priority}`;
+    },
+    onRejected: (error, confirmed, shouldRestore) => {
+      if (shouldRestore) updatePriorityControl(item.id, confirmed);
+      showError(error.message);
+    },
+  });
+  priorityUpdaters.set(item.id, updater);
+  return updater;
 }
 
 function renderItems({ focusItemId, focusSelector } = {}) {
@@ -89,35 +124,20 @@ function renderItems({ focusItemId, focusSelector } = {}) {
     title.textContent = item.title;
 
     const priority = document.createElement("select");
+    const priorityUpdater = getPriorityUpdater(item);
+    const displayedPriority = priorityUpdater.isPending()
+      ? priorityUpdater.getDesired()
+      : item.priority;
     priority.id = `priority-${item.id}`;
-    priority.className = `item-priority priority-${item.priority}`;
+    priority.className = `item-priority priority-${displayedPriority}`;
     priority.setAttribute("aria-label", `Priority for "${item.title}"`);
     for (const value of ["low", "medium", "high"]) {
       const option = document.createElement("option");
       option.value = value;
       option.textContent = value[0].toUpperCase() + value.slice(1);
-      option.selected = value === item.priority;
+      option.selected = value === displayedPriority;
       priority.append(option);
     }
-    const priorityUpdater = createPriorityUpdater({
-      initialPriority: item.priority,
-      save: (value) => setItemPriority(fetch, item.id, value),
-      onConfirmed: (updated, isLatest) => {
-        item.priority = updated.priority;
-        if (isLatest) {
-          priority.value = updated.priority;
-          priority.className = `item-priority priority-${updated.priority}`;
-        }
-        priorityStatusEl.textContent = `Priority for "${item.title}" changed to ${updated.priority}`;
-      },
-      onRejected: (error, confirmed, shouldRestore) => {
-        if (shouldRestore) {
-          priority.value = confirmed;
-          priority.className = `item-priority priority-${confirmed}`;
-        }
-        showError(error.message);
-      },
-    });
     priority.addEventListener("change", () => {
       clearError();
       priority.className = `item-priority priority-${priority.value}`;
@@ -198,6 +218,7 @@ async function removeItem(id) {
       showError("Failed to remove item");
       return;
     }
+    priorityUpdaters.delete(id);
     await fetchItems({ focusItemId: id, focusSelector: ".item-remove" });
   } catch {
     showError("Failed to remove item");

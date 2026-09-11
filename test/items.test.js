@@ -122,6 +122,8 @@ describe("item request handlers", () => {
 
     const firstChange = updater.change("high");
     const secondChange = updater.change("low");
+    assert.equal(updater.isPending(), true);
+    assert.equal(updater.getDesired(), "low");
     assert.deepEqual(requests.map(({ priority }) => priority), ["high"]);
 
     requests[0].resolve({ priority: "high" });
@@ -132,7 +134,31 @@ describe("item request handlers", () => {
     await Promise.all([firstChange, secondChange]);
 
     assert.equal(updater.getConfirmed(), "high");
+    assert.equal(updater.getDesired(), "high");
+    assert.equal(updater.isPending(), false);
     assert.deepEqual(confirmed, ["high"]);
     assert.deepEqual(rejected, [{ message: "save failed", priority: "high", shouldRestore: true }]);
+  });
+
+  test("pending desired priority remains available across UI rerenders", async () => {
+    let resolveSave;
+    const updater = createPriorityUpdater({
+      initialPriority: "medium",
+      save: () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+      onConfirmed() {},
+      onRejected() {},
+    });
+
+    const saving = updater.change("high");
+    assert.equal(updater.getDesired(), "high");
+    assert.equal(updater.isPending(), true);
+
+    resolveSave({ priority: "high" });
+    await saving;
+    assert.equal(updater.getDesired(), "high");
+    assert.equal(updater.isPending(), false);
   });
 });
