@@ -3,10 +3,23 @@
 
 import { buildReportsQuery, formatTotals } from "./reports.js";
 import { applyHealthView, createHealthMonitor } from "./health-status.js";
-import { addItemRequest, createPriorityUpdater, setItemPriority } from "./items.js";
+import {
+  addItemRequest,
+  countItemsByStatus,
+  createPriorityUpdater,
+  filterItems,
+  listItemsRequest,
+  setItemPriority,
+} from "./items.js";
 
 const listEl = document.getElementById("item-list");
 const emptyStateEl = document.getElementById("empty-state");
+const noMatchStateEl = document.getElementById("no-match-state");
+const searchEl = document.getElementById("item-search");
+const statusFilterEls = Array.from(document.querySelectorAll("[data-status]"));
+const filterCountEls = Array.from(document.querySelectorAll("[data-count]"));
+const clearFiltersEl = document.getElementById("clear-filters");
+const itemsSummaryEl = document.getElementById("items-summary");
 const formEl = document.getElementById("add-form");
 const inputEl = document.getElementById("title-input");
 const priorityEl = document.getElementById("priority-input");
@@ -27,6 +40,9 @@ const reportsTotalsEl = document.getElementById("reports-totals");
 const reportsTableEl = document.getElementById("reports-table");
 const reportsTableBodyEl = document.getElementById("reports-table-body");
 const reportsEmptyEl = document.getElementById("reports-empty");
+let items = [];
+let selectedStatus = "all";
+let itemsLoaded = false;
 
 function showError(message) {
   errorEl.textContent = message;
@@ -38,11 +54,25 @@ function clearError() {
   errorEl.textContent = "";
 }
 
-function renderItems(items) {
+function renderItems({ focusItemId, focusSelector } = {}) {
+  const visibleItems = filterItems(items, searchEl.value, selectedStatus);
+  const counts = countItemsByStatus(items);
   listEl.innerHTML = "";
-  emptyStateEl.hidden = items.length > 0;
+  emptyStateEl.hidden = !itemsLoaded || items.length > 0;
+  noMatchStateEl.hidden = !itemsLoaded || items.length === 0 || visibleItems.length > 0;
+  itemsSummaryEl.textContent = itemsLoaded
+    ? `Showing ${visibleItems.length} of ${items.length} items`
+    : "Loading items…";
+  clearFiltersEl.disabled = searchEl.value.length === 0 && selectedStatus === "all";
 
-  for (const item of items) {
+  for (const button of statusFilterEls) {
+    button.setAttribute("aria-pressed", String(button.dataset.status === selectedStatus));
+  }
+  for (const count of filterCountEls) {
+    count.textContent = counts[count.dataset.count];
+  }
+
+  for (const item of visibleItems) {
     const li = document.createElement("li");
     li.className = "item" + (item.done ? " done" : "");
     li.dataset.id = item.id;
@@ -104,12 +134,34 @@ function renderItems(items) {
     li.append(checkbox, title, priority, removeBtn);
     listEl.append(li);
   }
+
+  if (focusItemId && focusSelector) {
+    const row = Array.from(listEl.children).find((element) => element.dataset.id === focusItemId);
+    const target = row?.querySelector(focusSelector);
+    if (target) {
+      target.focus();
+    } else {
+      statusFilterEls.find((button) => button.dataset.status === selectedStatus)?.focus();
+    }
+  }
 }
 
-async function fetchItems() {
-  const res = await fetch("/api/items");
-  const data = await res.json();
-  renderItems(data.items || []);
+async function fetchItems(focus = {}) {
+  try {
+    const nextItems = await listItemsRequest(fetch);
+    items = nextItems;
+    itemsLoaded = true;
+    renderItems(focus);
+    return true;
+  } catch (error) {
+    showError(error.message);
+    if (itemsLoaded) {
+      renderItems(focus);
+    } else {
+      itemsSummaryEl.textContent = "Unable to load items";
+    }
+    return false;
+  }
 }
 
 async function addItem(title, priority) {
@@ -126,22 +178,30 @@ async function addItem(title, priority) {
 
 async function toggleItem(id) {
   clearError();
-  const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "PATCH" });
-  if (!res.ok) {
+  try {
+    const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "PATCH" });
+    if (!res.ok) {
+      showError("Failed to update item");
+      return;
+    }
+    await fetchItems({ focusItemId: id, focusSelector: ".item-toggle" });
+  } catch {
     showError("Failed to update item");
-    return;
   }
-  await fetchItems();
 }
 
 async function removeItem(id) {
   clearError();
-  const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) {
+  try {
+    const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      showError("Failed to remove item");
+      return;
+    }
+    await fetchItems({ focusItemId: id, focusSelector: ".item-remove" });
+  } catch {
     showError("Failed to remove item");
-    return;
   }
-  await fetchItems();
 }
 
 const healthMonitor = createHealthMonitor({
@@ -178,6 +238,22 @@ formEl.addEventListener("submit", async (event) => {
     priorityEl.value = "medium";
   }
   inputEl.focus();
+});
+
+searchEl.addEventListener("input", () => renderItems());
+
+for (const button of statusFilterEls) {
+  button.addEventListener("click", () => {
+    selectedStatus = button.dataset.status;
+    renderItems();
+  });
+}
+
+clearFiltersEl.addEventListener("click", () => {
+  searchEl.value = "";
+  selectedStatus = "all";
+  renderItems();
+  searchEl.focus();
 });
 
 function toDateInputValue(date) {

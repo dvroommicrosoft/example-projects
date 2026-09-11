@@ -1,8 +1,71 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { addItemRequest, createPriorityUpdater, setItemPriority } from "../public/items.js";
+import {
+  addItemRequest,
+  countItemsByStatus,
+  createPriorityUpdater,
+  filterItems,
+  listItemsRequest,
+  setItemPriority,
+} from "../public/items.js";
+
+describe("item filters", () => {
+  const items = [
+    { id: "1", title: "First OPEN item", done: false },
+    { id: "2", title: "Fix [literal].", done: true },
+    { id: "3", title: "Another open item", done: false },
+  ];
+
+  test("combines trimmed case-insensitive literal title search with status", () => {
+    assert.deepEqual(
+      filterItems(items, "  OPEN  ", "open").map(({ id }) => id),
+      ["1", "3"],
+    );
+    assert.deepEqual(
+      filterItems(items, "[LITERAL].", "done").map(({ id }) => id),
+      ["2"],
+    );
+  });
+
+  test("preserves source order without mutating the canonical array", () => {
+    const filtered = filterItems(items, "item", "all");
+    assert.deepEqual(filtered.map(({ id }) => id), ["1", "3"]);
+    assert.deepEqual(items.map(({ id }) => id), ["1", "2", "3"]);
+  });
+
+  test("counts statuses from the full item list", () => {
+    assert.deepEqual(countItemsByStatus(items), { all: 3, open: 2, done: 1 });
+  });
+});
 
 describe("item request handlers", () => {
+  test("listItemsRequest validates success and the item array", async () => {
+    const items = await listItemsRequest(async () => ({
+      ok: true,
+      json: async () => ({ items: [{ id: "1", title: "One", done: false }] }),
+    }));
+    assert.deepEqual(items, [{ id: "1", title: "One", done: false }]);
+
+    await assert.rejects(
+      listItemsRequest(async () => ({ ok: true, json: async () => ({ items: null }) })),
+      /Failed to load items/,
+    );
+    await assert.rejects(
+      listItemsRequest(async () => ({
+        ok: true,
+        json: async () => ({ items: [{ id: "1", title: "Incomplete" }] }),
+      })),
+      /Failed to load items/,
+    );
+    await assert.rejects(
+      listItemsRequest(async () => ({
+        ok: false,
+        json: async () => ({ error: "Items unavailable" }),
+      })),
+      /Items unavailable/,
+    );
+  });
+
   test("addItemRequest sends the selected priority", async () => {
     let request;
     const item = await addItemRequest(async (url, options) => {

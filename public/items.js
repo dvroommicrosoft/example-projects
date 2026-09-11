@@ -3,6 +3,45 @@ async function readError(response, fallback) {
   return data.error || fallback;
 }
 
+export async function listItemsRequest(fetchFn) {
+  const response = await fetchFn("/api/items");
+  if (!response.ok) {
+    throw new Error(await readError(response, "Failed to load items"));
+  }
+
+  const data = await response.json();
+  if (
+    !Array.isArray(data.items) ||
+    !data.items.every(
+      (item) =>
+        item &&
+        typeof item.id === "string" &&
+        typeof item.title === "string" &&
+        typeof item.done === "boolean",
+    )
+  ) {
+    throw new Error("Failed to load items");
+  }
+  return data.items;
+}
+
+export function filterItems(items, query, status) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  return items.filter((item) => {
+    const matchesTitle = item.title.toLocaleLowerCase().includes(normalizedQuery);
+    const matchesStatus =
+      status === "all" ||
+      (status === "open" && !item.done) ||
+      (status === "done" && item.done);
+    return matchesTitle && matchesStatus;
+  });
+}
+
+export function countItemsByStatus(items) {
+  const done = items.filter((item) => item.done).length;
+  return { all: items.length, open: items.length - done, done };
+}
+
 export async function addItemRequest(fetchFn, title, priority) {
   const response = await fetchFn("/api/items", {
     method: "POST",

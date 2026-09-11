@@ -11,6 +11,7 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 ## Features
 
 - List / add / prioritize / toggle / remove triage items
+- Client-side title search and All/Open/Done filters with live item counts
 - In-memory store (resets on restart) with basic validation
 - JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
 - Live, accessible API health banner that refreshes without reloading
