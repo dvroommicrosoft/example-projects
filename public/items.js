@@ -104,6 +104,12 @@ export function createPriorityUpdater({ initialPriority, save, onConfirmed, onRe
       desired = priority;
       return drain();
     },
+    reconcile(priority) {
+      if (pending !== undefined || desired !== confirmed) return false;
+      confirmed = priority;
+      desired = priority;
+      return true;
+    },
     getConfirmed: () => confirmed,
     getDesired: () => desired,
     isPending: () => pending !== undefined || desired !== confirmed,

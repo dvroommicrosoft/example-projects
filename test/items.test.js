@@ -173,4 +173,43 @@ describe("item request handlers", () => {
     assert.equal(updater.getDesired(), "high");
     assert.equal(updater.isPending(), false);
   });
+
+  test("idle updater reconciles refreshed server priority before the next change", async () => {
+    const saved = [];
+    const updater = createPriorityUpdater({
+      initialPriority: "medium",
+      save: async (priority) => {
+        saved.push(priority);
+        return { priority };
+      },
+      onConfirmed() {},
+      onRejected() {},
+    });
+
+    assert.equal(updater.reconcile("high"), true);
+    assert.equal(updater.getConfirmed(), "high");
+    await updater.change("medium");
+    assert.deepEqual(saved, ["medium"]);
+  });
+
+  test("reconciliation does not replace an in-flight desired priority", async () => {
+    let resolveSave;
+    const updater = createPriorityUpdater({
+      initialPriority: "medium",
+      save: () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        }),
+      onConfirmed() {},
+      onRejected() {},
+    });
+
+    const saving = updater.change("high");
+    assert.equal(updater.reconcile("low"), false);
+    assert.equal(updater.getDesired(), "high");
+
+    resolveSave({ priority: "high" });
+    await saving;
+    assert.equal(updater.getConfirmed(), "high");
+  });
 });

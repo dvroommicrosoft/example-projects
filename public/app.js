@@ -71,7 +71,10 @@ function updatePriorityControl(itemId, priority) {
 
 function getPriorityUpdater(item) {
   let updater = priorityUpdaters.get(item.id);
-  if (updater) return updater;
+  if (updater) {
+    updater.reconcile(item.priority);
+    return updater;
+  }
 
   updater = createPriorityUpdater({
     initialPriority: item.priority,
