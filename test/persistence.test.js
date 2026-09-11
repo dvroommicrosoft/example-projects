@@ -5,7 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { createConfiguredStore } from "../server.js";
+import { createApp, createConfiguredStore } from "../server.js";
 import { createPersistentStore, PersistenceError } from "../src/persistence.js";
 
 const ownedDirectories = [];
@@ -162,6 +162,76 @@ describe("persistent store", () => {
     assert.deepEqual(items.map((item) => item.id), ["1", "2", "3", "4"]);
     assert.equal((await createPersistentStore({ filePath })).list().length, 4);
   });
+
+  test("rejects counter-exhausting mutations without committing or poisoning the queue", async () => {
+    const cases = [
+      {
+        name: "item add",
+        snapshot: { version: 1, items: [], activity: [], nextId: Number.MAX_SAFE_INTEGER, nextActivityId: 1 },
+        mutate: (store) => store.add("Exhaust item ids"),
+        recover: (store) => store.clear(),
+      },
+      {
+        name: "activity add",
+        snapshot: { version: 1, items: [], activity: [], nextId: 1, nextActivityId: Number.MAX_SAFE_INTEGER },
+        mutate: (store) => store.add("Exhaust activity ids"),
+        recover: (store) => store.clear(),
+      },
+      {
+        name: "activity toggle",
+        snapshot: {
+          version: 1,
+          items: [{ id: "1", title: "Existing", done: false, priority: "low", createdAt: new Date().toISOString() }],
+          activity: [],
+          nextId: 2,
+          nextActivityId: Number.MAX_SAFE_INTEGER,
+        },
+        mutate: (store) => store.toggle("1"),
+        recover: (store) => store.setPriority("1", "high"),
+      },
+      {
+        name: "activity delete",
+        snapshot: {
+          version: 1,
+          items: [{ id: "1", title: "Existing", done: false, priority: "low", createdAt: new Date().toISOString() }],
+          activity: [],
+          nextId: 2,
+          nextActivityId: Number.MAX_SAFE_INTEGER,
+        },
+        mutate: (store) => store.remove("1"),
+        recover: (store) => store.setPriority("1", "high"),
+      },
+    ];
+
+    for (const testCase of cases) {
+      const directory = await temporaryDirectory();
+      const filePath = path.join(directory, `${testCase.name.replaceAll(" ", "-")}.json`);
+      await fsPromises.writeFile(filePath, JSON.stringify(testCase.snapshot));
+      const originalBytes = await fsPromises.readFile(filePath, "utf8");
+      const store = await createPersistentStore({ filePath });
+
+      await assert.rejects(() => testCase.mutate(store), PersistenceError);
+      assert.deepEqual(store.exportSnapshot(), testCase.snapshot);
+      assert.equal(await fsPromises.readFile(filePath, "utf8"), originalBytes);
+
+      await testCase.recover(store);
+      await createPersistentStore({ filePath });
+    }
+  });
+
+  test("rejects an initialization seed that cannot produce a valid snapshot", async () => {
+    const directory = await temporaryDirectory();
+    const filePath = path.join(directory, "invalid-seed.json");
+    await assert.rejects(
+      () =>
+        createPersistentStore({
+          filePath,
+          seed: [{ id: String(Number.MAX_SAFE_INTEGER), title: "Too high", done: false, createdAt: new Date().toISOString() }],
+        }),
+      /initial state is invalid/,
+    );
+    await assert.rejects(() => fsPromises.access(filePath), { code: "ENOENT" });
+  });
 });
 
 describe("persistence configuration", () => {
@@ -186,6 +256,35 @@ describe("persistence configuration", () => {
       () => createConfiguredStore({ TRIAGE_DATA_FILE: path.join(link, "triage.json") }),
       /outside the public directory/,
     );
+  });
+
+  test("rejects outward public symlinks and never serves their snapshots", async () => {
+    const directory = await temporaryDirectory();
+    const filePath = path.join(directory, "private.json");
+    await createPersistentStore({ filePath });
+    const linkName = `persistence-test-${process.pid}-${Date.now()}`;
+    const linkPath = path.resolve("public", linkName);
+    await fsPromises.symlink(directory, linkPath, "dir");
+    try {
+      await assert.rejects(
+        () => createConfiguredStore({ TRIAGE_DATA_FILE: path.join(linkPath, "other.json") }),
+        /outside the public directory/,
+      );
+
+      const server = createApp();
+      await new Promise((resolve) => server.listen(0, resolve));
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:${server.address().port}/${linkName}/private.json`,
+        );
+        assert.equal(response.status, 403);
+        assert.doesNotMatch(await response.text(), /nextActivityId/);
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
+    } finally {
+      await fsPromises.unlink(linkPath);
+    }
   });
 });
 

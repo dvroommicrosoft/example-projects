@@ -64,24 +64,40 @@ function readBody(req) {
   });
 }
 
-function serveStatic(req, res, pathname) {
-  const relPath = pathname === "/" ? "/index.html" : pathname;
-  const filePath = path.normalize(path.join(PUBLIC_DIR, relPath));
+function isWithin(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
 
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+async function serveStatic(req, res, pathname) {
+  const relPath = pathname === "/" ? "/index.html" : pathname;
+  const filePath = path.resolve(PUBLIC_DIR, `.${relPath}`);
+
+  if (!isWithin(PUBLIC_DIR, filePath)) {
     sendJson(res, 403, { error: "forbidden" });
     return;
   }
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      sendJson(res, 404, { error: "not found" });
-      return;
-    }
-    const ext = path.extname(filePath);
+  let canonicalPath;
+  try {
+    canonicalPath = await fs.promises.realpath(filePath);
+  } catch {
+    sendJson(res, 404, { error: "not found" });
+    return;
+  }
+  if (!isWithin(PUBLIC_DIR, canonicalPath)) {
+    sendJson(res, 403, { error: "forbidden" });
+    return;
+  }
+
+  try {
+    const data = await fs.promises.readFile(canonicalPath);
+    const ext = path.extname(canonicalPath);
     res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" });
     res.end(data);
-  });
+  } catch {
+    sendJson(res, 404, { error: "not found" });
+  }
 }
 
 export function createApp(appStore = store) {
@@ -195,7 +211,7 @@ export function createApp(appStore = store) {
       }
 
       if (req.method === "GET") {
-        serveStatic(req, res, pathname);
+        await serveStatic(req, res, pathname);
         return;
       }
 
@@ -237,6 +253,9 @@ export async function createConfiguredStore(env = process.env, cwd = process.cwd
   }
 
   const filePath = path.resolve(cwd, env.TRIAGE_DATA_FILE);
+  if (isWithin(PUBLIC_DIR, filePath)) {
+    throw new PersistenceError("TRIAGE_DATA_FILE must be outside the public directory");
+  }
   let canonicalFile;
   let canonicalPublic;
   try {
@@ -247,10 +266,7 @@ export async function createConfiguredStore(env = process.env, cwd = process.cwd
   } catch (cause) {
     throw new PersistenceError("could not resolve data file path", { cause });
   }
-  if (
-    canonicalFile === canonicalPublic ||
-    canonicalFile.startsWith(`${canonicalPublic}${path.sep}`)
-  ) {
+  if (isWithin(canonicalPublic, canonicalFile)) {
     throw new PersistenceError("TRIAGE_DATA_FILE must be outside the public directory");
   }
 

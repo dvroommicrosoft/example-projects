@@ -65,6 +65,14 @@ async function readExistingStore(filePath, fileSystem) {
   }
 }
 
+function validatedStore(store, message) {
+  try {
+    return createStoreFromSnapshot(store.exportSnapshot());
+  } catch (cause) {
+    throw new PersistenceError(message, { cause });
+  }
+}
+
 export async function createPersistentStore({
   filePath,
   seed = [],
@@ -81,7 +89,7 @@ export async function createPersistentStore({
     } catch (cause) {
       throw new PersistenceError("could not create data directory", { cause });
     }
-    committed = createStore(seed);
+    committed = validatedStore(createStore(seed), "initial state is invalid");
     await writeSnapshot(filePath, committed.exportSnapshot(), fileSystem);
   }
 
@@ -91,8 +99,9 @@ export async function createPersistentStore({
       const draft = createStoreFromSnapshot(committed.exportSnapshot());
       const result = draft[method](...args);
       if (isNoop(result)) return result;
-      await writeSnapshot(filePath, draft.exportSnapshot(), fileSystem);
-      committed = draft;
+      const validatedDraft = validatedStore(draft, "mutation would exhaust persistent state");
+      await writeSnapshot(filePath, validatedDraft.exportSnapshot(), fileSystem);
+      committed = validatedDraft;
       return result;
     });
     queue = operation.catch(() => {});
