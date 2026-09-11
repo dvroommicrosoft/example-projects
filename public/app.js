@@ -3,12 +3,29 @@
 
 import { buildReportsQuery, formatTotals } from "./reports.js";
 import { applyHealthView, createHealthMonitor } from "./health-status.js";
+import {
+  addItemRequest,
+  countItemsByStatus,
+  createPriorityUpdater,
+  describeItemsSummary,
+  filterItems,
+  listItemsRequest,
+  setItemPriority,
+} from "./items.js";
 
 const listEl = document.getElementById("item-list");
 const emptyStateEl = document.getElementById("empty-state");
+const noMatchStateEl = document.getElementById("no-match-state");
+const searchEl = document.getElementById("item-search");
+const statusFilterEls = Array.from(document.querySelectorAll("[data-status]"));
+const filterCountEls = Array.from(document.querySelectorAll("[data-count]"));
+const clearFiltersEl = document.getElementById("clear-filters");
+const itemsSummaryEl = document.getElementById("items-summary");
 const formEl = document.getElementById("add-form");
 const inputEl = document.getElementById("title-input");
+const priorityEl = document.getElementById("priority-input");
 const errorEl = document.getElementById("error-message");
+const priorityStatusEl = document.getElementById("priority-status");
 const healthElements = {
   banner: document.getElementById("api-health"),
   label: document.getElementById("api-health-label"),
@@ -24,6 +41,11 @@ const reportsTotalsEl = document.getElementById("reports-totals");
 const reportsTableEl = document.getElementById("reports-table");
 const reportsTableBodyEl = document.getElementById("reports-table-body");
 const reportsEmptyEl = document.getElementById("reports-empty");
+let items = [];
+let selectedStatus = "all";
+let itemsLoaded = false;
+let itemsLoadFailed = false;
+const priorityUpdaters = new Map();
 
 function showError(message) {
   errorEl.textContent = message;
@@ -35,11 +57,65 @@ function clearError() {
   errorEl.textContent = "";
 }
 
-function renderItems(items) {
-  listEl.innerHTML = "";
-  emptyStateEl.hidden = items.length > 0;
+function findPriorityControl(itemId) {
+  const row = Array.from(listEl.children).find((element) => element.dataset.id === itemId);
+  return row?.querySelector(".item-priority");
+}
 
-  for (const item of items) {
+function updatePriorityControl(itemId, priority) {
+  const control = findPriorityControl(itemId);
+  if (!control) return;
+  control.value = priority;
+  control.className = `item-priority priority-${priority}`;
+}
+
+function getPriorityUpdater(item) {
+  let updater = priorityUpdaters.get(item.id);
+  if (updater) {
+    updater.reconcile(item.priority);
+    return updater;
+  }
+
+  updater = createPriorityUpdater({
+    initialPriority: item.priority,
+    save: (value) => setItemPriority(fetch, item.id, value),
+    onConfirmed: (updated, isLatest) => {
+      const currentItem = items.find(({ id }) => id === item.id);
+      if (currentItem) currentItem.priority = updated.priority;
+      if (isLatest) updatePriorityControl(item.id, updated.priority);
+      priorityStatusEl.textContent = `Priority for "${item.title}" changed to ${updated.priority}`;
+    },
+    onRejected: (error, confirmed, shouldRestore) => {
+      if (shouldRestore) updatePriorityControl(item.id, confirmed);
+      showError(error.message);
+    },
+  });
+  priorityUpdaters.set(item.id, updater);
+  return updater;
+}
+
+function renderItems({ focusItemId, focusSelector } = {}) {
+  const visibleItems = filterItems(items, searchEl.value, selectedStatus);
+  const counts = countItemsByStatus(items);
+  listEl.innerHTML = "";
+  emptyStateEl.hidden = !itemsLoaded || items.length > 0;
+  noMatchStateEl.hidden = !itemsLoaded || items.length === 0 || visibleItems.length > 0;
+  itemsSummaryEl.textContent = describeItemsSummary({
+    loaded: itemsLoaded,
+    failed: itemsLoadFailed,
+    visible: visibleItems.length,
+    total: items.length,
+  });
+  clearFiltersEl.disabled = searchEl.value.length === 0 && selectedStatus === "all";
+
+  for (const button of statusFilterEls) {
+    button.setAttribute("aria-pressed", String(button.dataset.status === selectedStatus));
+  }
+  for (const count of filterCountEls) {
+    count.textContent = counts[count.dataset.count];
+  }
+
+  for (const item of visibleItems) {
     const li = document.createElement("li");
     li.className = "item" + (item.done ? " done" : "");
     li.dataset.id = item.id;
@@ -55,6 +131,27 @@ function renderItems(items) {
     title.className = "item-title";
     title.textContent = item.title;
 
+    const priority = document.createElement("select");
+    const priorityUpdater = getPriorityUpdater(item);
+    const displayedPriority = priorityUpdater.isPending()
+      ? priorityUpdater.getDesired()
+      : item.priority;
+    priority.id = `priority-${item.id}`;
+    priority.className = `item-priority priority-${displayedPriority}`;
+    priority.setAttribute("aria-label", `Priority for "${item.title}"`);
+    for (const value of ["low", "medium", "high"]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value[0].toUpperCase() + value.slice(1);
+      option.selected = value === displayedPriority;
+      priority.append(option);
+    }
+    priority.addEventListener("change", () => {
+      clearError();
+      priority.className = `item-priority priority-${priority.value}`;
+      void priorityUpdater.change(priority.value);
+    });
+
     const removeBtn = document.createElement("button");
     removeBtn.className = "item-remove";
     removeBtn.type = "button";
@@ -62,50 +159,80 @@ function renderItems(items) {
     removeBtn.setAttribute("aria-label", `Remove "${item.title}"`);
     removeBtn.addEventListener("click", () => removeItem(item.id));
 
-    li.append(checkbox, title, removeBtn);
+    li.append(checkbox, title, priority, removeBtn);
     listEl.append(li);
   }
-}
 
-async function fetchItems() {
-  const res = await fetch("/api/items");
-  const data = await res.json();
-  renderItems(data.items || []);
-}
-
-async function addItem(title) {
-  clearError();
-  const res = await fetch("/api/items", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    showError(data.error || "Failed to add item");
-    return;
+  if (focusItemId && focusSelector) {
+    const row = Array.from(listEl.children).find((element) => element.dataset.id === focusItemId);
+    const target = row?.querySelector(focusSelector);
+    if (target) {
+      target.focus();
+    } else {
+      statusFilterEls.find((button) => button.dataset.status === selectedStatus)?.focus();
+    }
   }
-  await fetchItems();
+}
+
+async function fetchItems(focus = {}) {
+  try {
+    const nextItems = await listItemsRequest(fetch);
+    items = nextItems;
+    itemsLoaded = true;
+    itemsLoadFailed = false;
+    const itemIds = new Set(items.map(({ id }) => id));
+    for (const id of priorityUpdaters.keys()) {
+      if (!itemIds.has(id)) priorityUpdaters.delete(id);
+    }
+    renderItems(focus);
+    return true;
+  } catch (error) {
+    showError(error.message);
+    itemsLoadFailed = true;
+    renderItems(itemsLoaded ? focus : {});
+    return false;
+  }
+}
+
+async function addItem(title, priority) {
+  clearError();
+  try {
+    await addItemRequest(fetch, title, priority);
+    await fetchItems();
+    return true;
+  } catch (error) {
+    showError(error.message);
+    return false;
+  }
 }
 
 async function toggleItem(id) {
   clearError();
-  const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "PATCH" });
-  if (!res.ok) {
+  try {
+    const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "PATCH" });
+    if (!res.ok) {
+      showError("Failed to update item");
+      return;
+    }
+    await fetchItems({ focusItemId: id, focusSelector: ".item-toggle" });
+  } catch {
     showError("Failed to update item");
-    return;
   }
-  await fetchItems();
 }
 
 async function removeItem(id) {
   clearError();
-  const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) {
+  try {
+    const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      showError("Failed to remove item");
+      return;
+    }
+    priorityUpdaters.delete(id);
+    await fetchItems({ focusItemId: id, focusSelector: ".item-remove" });
+  } catch {
     showError("Failed to remove item");
-    return;
   }
-  await fetchItems();
 }
 
 const healthMonitor = createHealthMonitor({
@@ -136,9 +263,28 @@ formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   const title = inputEl.value.trim();
   if (!title) return;
-  await addItem(title);
-  inputEl.value = "";
+  const added = await addItem(title, priorityEl.value);
+  if (added) {
+    inputEl.value = "";
+    priorityEl.value = "medium";
+  }
   inputEl.focus();
+});
+
+searchEl.addEventListener("input", () => renderItems());
+
+for (const button of statusFilterEls) {
+  button.addEventListener("click", () => {
+    selectedStatus = button.dataset.status;
+    renderItems();
+  });
+}
+
+clearFiltersEl.addEventListener("click", () => {
+  searchEl.value = "";
+  selectedStatus = "all";
+  renderItems();
+  searchEl.focus();
 });
 
 function toDateInputValue(date) {

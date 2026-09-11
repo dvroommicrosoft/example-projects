@@ -10,7 +10,8 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 
 ## Features
 
-- List / add / toggle / remove triage items
+- List / add / prioritize / toggle / remove triage items
+- Client-side title search and All/Open/Done filters with live item counts
 - In-memory store (resets on restart) with basic validation
 - JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
 - Live, accessible API health banner that refreshes without reloading
@@ -84,10 +85,15 @@ test/             # node:test suites for the store, reports, and the API
 |--------|-------------------|----------------------------------|
 | GET    | `/api/health`     | Health check                    |
 | GET    | `/api/items`      | List all items                  |
-| POST   | `/api/items`      | Add an item, body `{ "title": "..." }` |
-| PATCH  | `/api/items/:id`  | Toggle an item's `done` state   |
+| POST   | `/api/items`      | Add an item, body `{ "title": "...", "priority": "low" }` |
+| PATCH  | `/api/items/:id`  | Toggle completion or update priority |
 | DELETE | `/api/items/:id`  | Remove an item                  |
 | GET    | `/api/reports`    | Activity report for a timeframe (see below) |
+
+Priority may be `low`, `medium`, or `high`. Omitting it when creating an item
+defaults to `medium`. For compatibility, a bodyless request or `{}` to
+`PATCH /api/items/:id` toggles completion; `{ "priority": "high" }` changes
+only priority. Other nonempty PATCH bodies are rejected.
 
 ### `GET /api/reports`
 

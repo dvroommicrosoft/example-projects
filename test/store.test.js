@@ -14,13 +14,29 @@ describe("store", () => {
     assert.deepEqual(store.list(), []);
   });
 
-  test("add() creates an item with trimmed title and done=false", () => {
+  test("add() creates an item with trimmed title, done=false, and medium priority", () => {
     const item = store.add("  Write tests  ");
     assert.equal(item.title, "Write tests");
     assert.equal(item.done, false);
+    assert.equal(item.priority, "medium");
     assert.ok(item.id);
     assert.ok(item.createdAt);
     assert.equal(store.list().length, 1);
+  });
+
+  test("add() accepts each explicit priority and rejects invalid values", () => {
+    for (const priority of ["low", "medium", "high"]) {
+      assert.equal(store.add(priority, priority).priority, priority);
+    }
+    assert.throws(() => store.add("Invalid", "urgent"), /priority must be one of/);
+    assert.equal(store.list().length, 3);
+  });
+
+  test("legacy seeds default to medium priority", () => {
+    const seeded = createStore([
+      { id: "1", title: "Legacy", done: false, createdAt: new Date().toISOString() },
+    ]);
+    assert.equal(seeded.get("1").priority, "medium");
   });
 
   test("add() rejects empty or blank titles", () => {
@@ -44,6 +60,25 @@ describe("store", () => {
 
   test("toggle() returns undefined for unknown id", () => {
     assert.equal(store.toggle("nope"), undefined);
+  });
+
+  test("setPriority() changes priority only and does not record activity", () => {
+    const item = store.add("Prioritize me", "low");
+    store.toggle(item.id);
+    const activityBefore = store.getActivity();
+
+    const updated = store.setPriority(item.id, "high");
+
+    assert.equal(updated.priority, "high");
+    assert.equal(updated.done, true);
+    assert.deepEqual(store.getActivity(), activityBefore);
+  });
+
+  test("setPriority() validates before mutation", () => {
+    const item = store.add("Keep me", "low");
+    assert.throws(() => store.setPriority(item.id, "urgent"), /priority must be one of/);
+    assert.equal(store.get(item.id).priority, "low");
+    assert.equal(store.setPriority("nope", "high"), undefined);
   });
 
   test("remove() deletes an item and returns true", () => {

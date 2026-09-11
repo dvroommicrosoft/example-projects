@@ -135,14 +135,35 @@ export function createApp(appStore = store) {
 
       if (pathname === "/api/items" && req.method === "POST") {
         const body = await readBody(req);
-        const item = appStore.add(body.title);
+        const item = appStore.add(body.title, body.priority);
         sendJson(res, 201, { item });
         return;
       }
 
       const itemMatch = pathname.match(/^\/api\/items\/([^/]+)$/);
       if (itemMatch && req.method === "PATCH") {
-        const item = appStore.toggle(decodeURIComponent(itemMatch[1]));
+        const id = decodeURIComponent(itemMatch[1]);
+        if (!appStore.get(id)) {
+          sendJson(res, 404, { error: "item not found" });
+          return;
+        }
+
+        const body = await readBody(req);
+        if (!body || Array.isArray(body) || typeof body !== "object") {
+          sendJson(res, 400, { error: "request body must be an object" });
+          return;
+        }
+
+        const keys = Object.keys(body);
+        let item;
+        if (keys.length === 0) {
+          item = appStore.toggle(id);
+        } else if (keys.length === 1 && keys[0] === "priority") {
+          item = appStore.setPriority(id, body.priority);
+        } else {
+          sendJson(res, 400, { error: "PATCH body must be empty or contain only priority" });
+          return;
+        }
         if (!item) {
           sendJson(res, 404, { error: "item not found" });
           return;
