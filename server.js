@@ -7,17 +7,23 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./src/store.js";
+import { createPersistentStore, PersistenceError } from "./src/persistence.js";
 import { buildReport, EVENT_TYPES } from "./src/reports.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT) || 3000;
 
-const store = createStore([
-  { id: "1", title: "Triage incoming bug reports", done: false, createdAt: new Date().toISOString() },
-  { id: "2", title: "Label good-first-issues", done: false, createdAt: new Date().toISOString() },
-  { id: "3", title: "Say hello to Tiny Triage", done: true, createdAt: new Date().toISOString() },
-]);
+function createDemoSeed() {
+  const createdAt = new Date().toISOString();
+  return [
+    { id: "1", title: "Triage incoming bug reports", done: false, createdAt },
+    { id: "2", title: "Label good-first-issues", done: false, createdAt },
+    { id: "3", title: "Say hello to Tiny Triage", done: true, createdAt },
+  ];
+}
+
+const store = createStore(createDemoSeed());
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -58,24 +64,40 @@ function readBody(req) {
   });
 }
 
-function serveStatic(req, res, pathname) {
-  const relPath = pathname === "/" ? "/index.html" : pathname;
-  const filePath = path.normalize(path.join(PUBLIC_DIR, relPath));
+function isWithin(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
 
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+async function serveStatic(req, res, pathname) {
+  const relPath = pathname === "/" ? "/index.html" : pathname;
+  const filePath = path.resolve(PUBLIC_DIR, `.${relPath}`);
+
+  if (!isWithin(PUBLIC_DIR, filePath)) {
     sendJson(res, 403, { error: "forbidden" });
     return;
   }
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      sendJson(res, 404, { error: "not found" });
-      return;
-    }
-    const ext = path.extname(filePath);
+  let canonicalPath;
+  try {
+    canonicalPath = await fs.promises.realpath(filePath);
+  } catch {
+    sendJson(res, 404, { error: "not found" });
+    return;
+  }
+  if (!isWithin(PUBLIC_DIR, canonicalPath)) {
+    sendJson(res, 403, { error: "forbidden" });
+    return;
+  }
+
+  try {
+    const data = await fs.promises.readFile(canonicalPath);
+    const ext = path.extname(canonicalPath);
     res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" });
     res.end(data);
-  });
+  } catch {
+    sendJson(res, 404, { error: "not found" });
+  }
 }
 
 export function createApp(appStore = store) {
@@ -135,7 +157,7 @@ export function createApp(appStore = store) {
 
       if (pathname === "/api/items" && req.method === "POST") {
         const body = await readBody(req);
-        const item = appStore.add(body.title, body.priority);
+        const item = await appStore.add(body.title, body.priority);
         sendJson(res, 201, { item });
         return;
       }
@@ -157,9 +179,9 @@ export function createApp(appStore = store) {
         const keys = Object.keys(body);
         let item;
         if (keys.length === 0) {
-          item = appStore.toggle(id);
+          item = await appStore.toggle(id);
         } else if (keys.length === 1 && keys[0] === "priority") {
-          item = appStore.setPriority(id, body.priority);
+          item = await appStore.setPriority(id, body.priority);
         } else {
           sendJson(res, 400, { error: "PATCH body must be empty or contain only priority" });
           return;
@@ -173,7 +195,7 @@ export function createApp(appStore = store) {
       }
 
       if (itemMatch && req.method === "DELETE") {
-        const removed = appStore.remove(decodeURIComponent(itemMatch[1]));
+        const removed = await appStore.remove(decodeURIComponent(itemMatch[1]));
         if (!removed) {
           sendJson(res, 404, { error: "item not found" });
           return;
@@ -189,20 +211,91 @@ export function createApp(appStore = store) {
       }
 
       if (req.method === "GET") {
-        serveStatic(req, res, pathname);
+        await serveStatic(req, res, pathname);
         return;
       }
 
       sendJson(res, 405, { error: "method not allowed" });
     } catch (err) {
+      if (err instanceof PersistenceError) {
+        console.error("Persistent storage operation failed:", err.cause || err);
+        sendJson(res, 500, { error: "could not save changes" });
+        return;
+      }
       sendJson(res, 400, { error: err.message || "bad request" });
     }
   });
 }
 
-if (process.env.NODE_ENV !== "test" && import.meta.url === `file://${process.argv[1]}`) {
-  const app = createApp();
-  app.listen(PORT, () => {
-    console.log(`Tiny Triage listening on http://localhost:${PORT}`);
+async function canonicalizeCandidate(filePath) {
+  let current = filePath;
+  const missingSegments = [];
+  while (true) {
+    try {
+      const existingPath = await fs.promises.realpath(current);
+      return path.join(existingPath, ...missingSegments);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      const parent = path.dirname(current);
+      if (parent === current) throw error;
+      missingSegments.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+export async function createConfiguredStore(env = process.env, cwd = process.cwd()) {
+  if (!Object.hasOwn(env, "TRIAGE_DATA_FILE")) {
+    return { store: createStore(createDemoSeed()), mode: "memory" };
+  }
+  if (typeof env.TRIAGE_DATA_FILE !== "string" || !env.TRIAGE_DATA_FILE.trim()) {
+    throw new PersistenceError("TRIAGE_DATA_FILE must be a nonblank path");
+  }
+
+  const filePath = path.resolve(cwd, env.TRIAGE_DATA_FILE);
+  if (isWithin(PUBLIC_DIR, filePath)) {
+    throw new PersistenceError("TRIAGE_DATA_FILE must be outside the public directory");
+  }
+  let canonicalFile;
+  let canonicalPublic;
+  try {
+    [canonicalFile, canonicalPublic] = await Promise.all([
+      canonicalizeCandidate(filePath),
+      fs.promises.realpath(PUBLIC_DIR),
+    ]);
+  } catch (cause) {
+    throw new PersistenceError("could not resolve data file path", { cause });
+  }
+  if (isWithin(canonicalPublic, canonicalFile)) {
+    throw new PersistenceError("TRIAGE_DATA_FILE must be outside the public directory");
+  }
+
+  return {
+    store: await createPersistentStore({ filePath: canonicalFile, seed: createDemoSeed() }),
+    mode: `file (${canonicalFile})`,
+  };
+}
+
+export async function startServer(env = process.env, cwd = process.cwd()) {
+  const configured = await createConfiguredStore(env, cwd);
+  const port = Number(env.PORT) || PORT;
+  const app = createApp(configured.store);
+  await new Promise((resolve, reject) => {
+    app.once("error", reject);
+    app.listen(port, () => {
+      app.off("error", reject);
+      resolve();
+    });
+  });
+  console.log(`Tiny Triage listening on http://localhost:${app.address().port}`);
+  console.log(`Storage mode: ${configured.mode}`);
+  return app;
+}
+
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+if (process.env.NODE_ENV !== "test" && isMain) {
+  startServer().catch((error) => {
+    console.error(`Tiny Triage failed to start: ${error.message}`);
+    process.exitCode = 1;
   });
 }
