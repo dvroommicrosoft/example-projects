@@ -3,6 +3,7 @@ import { test, describe, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../server.js";
 import { createStore } from "../src/store.js";
+import { PersistenceError } from "../src/persistence.js";
 
 describe("API", () => {
   let server;
@@ -228,5 +229,31 @@ describe("API", () => {
       `${baseUrl}/api/reports?from=2026-01-02T00:00:00.000Z&to=2026-01-01T00:00:00.000Z`,
     );
     assert.equal(res.status, 400);
+  });
+
+  test("storage failures return a sanitized 500 response", async () => {
+    const failingStore = createStore();
+    failingStore.add = async () => {
+      throw new PersistenceError("could not save /private/triage.json", {
+        cause: new Error("disk full"),
+      });
+    };
+    const failingServer = createApp(failingStore);
+    await new Promise((resolve) => failingServer.listen(0, resolve));
+    const failingUrl = `http://127.0.0.1:${failingServer.address().port}`;
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+      const res = await fetch(`${failingUrl}/api/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Will fail" }),
+      });
+      assert.equal(res.status, 500);
+      assert.deepEqual(await res.json(), { error: "could not save changes" });
+    } finally {
+      console.error = originalError;
+      await new Promise((resolve) => failingServer.close(resolve));
+    }
   });
 });

@@ -12,7 +12,7 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 
 - List / add / prioritize / toggle / remove triage items
 - Client-side title search and All/Open/Done filters with live item counts
-- In-memory store (resets on restart) with basic validation
+- In-memory store by default, with optional file-backed persistence
 - JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
 - Live, accessible API health banner that refreshes without reloading
 - Activity reporting: `GET /api/reports` aggregates created/completed/reopened/deleted
@@ -45,6 +45,25 @@ To use a different port:
 PORT=4000 npm start
 ```
 
+To retain items and activity across restarts, opt in with a private data file:
+
+```bash
+TRIAGE_DATA_FILE=./data/triage.json npm start
+```
+
+The first run creates the parent directory and a versioned JSON snapshot
+containing the demo items. Later runs load that snapshot, including activity
+history and ID counters. An existing empty board remains empty. If the variable
+is unset, Tiny Triage stays entirely in memory and resets on restart; a blank
+value is an error.
+
+Keep the file outside `public/`; Tiny Triage rejects direct or symlinked paths
+inside the static directory. A malformed, unreadable, or unsupported snapshot
+stops startup without overwriting it or falling back to memory. Back up the file
+before manually repairing it. File-backed mode supports one Tiny Triage process
+per data file; multi-process writers and network-filesystem durability are not
+supported.
+
 For auto-restart on file changes during development:
 
 ```bash
@@ -74,6 +93,7 @@ linter dependency required).
 ```
 server.js        # HTTP server + routing + static file serving
 src/store.js      # In-memory item store (domain logic + activity log)
+src/persistence.js # Atomic, queued JSON snapshot persistence
 src/reports.js    # Aggregates activity into totals/day-buckets for reports
 public/           # Static front-end, including health-status.js and reports.js
 test/             # node:test suites for the store, reports, and the API
@@ -94,6 +114,10 @@ Priority may be `low`, `medium`, or `high`. Omitting it when creating an item
 defaults to `medium`. For compatibility, a bodyless request or `{}` to
 `PATCH /api/items/:id` toggles completion; `{ "priority": "high" }` changes
 only priority. Other nonempty PATCH bodies are rejected.
+
+Validation errors return `400`, missing items return `404`, and a failed
+persistent write returns a generic `500` response while the server logs the
+underlying cause. Failed writes do not publish partial state.
 
 ### `GET /api/reports`
 

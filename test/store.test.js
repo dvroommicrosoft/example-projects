@@ -1,7 +1,7 @@
 // test/store.test.js
 import { test, describe, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createStore } from "../src/store.js";
+import { createStore, createStoreFromSnapshot } from "../src/store.js";
 
 describe("store", () => {
   let store;
@@ -175,5 +175,57 @@ describe("store", () => {
     store.add("Item");
     store.clear();
     assert.deepEqual(store.getActivity(), []);
+  });
+
+  test("complete snapshots preserve history and counters without replaying activity", () => {
+    const first = store.add("First");
+    store.toggle(first.id);
+    store.remove(first.id);
+    const snapshot = store.exportSnapshot();
+
+    const restored = createStoreFromSnapshot(snapshot);
+    assert.deepEqual(restored.exportSnapshot(), snapshot);
+    assert.equal(restored.add("Second").id, "2");
+    assert.deepEqual(
+      restored.getActivity().map((entry) => entry.type),
+      ["created", "completed", "deleted", "created"],
+    );
+  });
+
+  test("snapshot export and restore do not share record references", () => {
+    store.add("Stable");
+    const snapshot = store.exportSnapshot();
+    snapshot.items[0].title = "Changed outside";
+    assert.equal(store.get("1").title, "Stable");
+
+    const restored = createStoreFromSnapshot(store.exportSnapshot());
+    const exported = restored.exportSnapshot();
+    exported.activity[0].title = "Changed again";
+    assert.equal(restored.getActivity()[0].title, "Stable");
+  });
+
+  test("snapshot validation rejects malformed state and unsafe counters", () => {
+    const timestamp = new Date().toISOString();
+    const valid = {
+      version: 1,
+      items: [{ id: "2", title: "Item", done: false, priority: "medium", createdAt: timestamp }],
+      activity: [],
+      nextId: 3,
+      nextActivityId: 1,
+    };
+    assert.throws(() => createStoreFromSnapshot({ ...valid, version: 2 }), /unsupported/);
+    assert.throws(() => createStoreFromSnapshot({ ...valid, nextId: 2 }), /nextId/);
+    assert.throws(
+      () => createStoreFromSnapshot({ ...valid, items: [...valid.items, { ...valid.items[0] }] }),
+      /duplicate item id/,
+    );
+  });
+
+  test("clear snapshots preserve counter progress", () => {
+    store.add("Used id");
+    store.clear();
+    const restored = createStoreFromSnapshot(store.exportSnapshot());
+    assert.equal(restored.add("After clear").id, "2");
+    assert.equal(restored.getActivity()[0].id, "2");
   });
 });
