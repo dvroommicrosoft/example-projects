@@ -212,4 +212,27 @@ describe("item request handlers", () => {
     await saving;
     assert.equal(updater.getConfirmed(), "high");
   });
+
+  test("failed change rolls back to the reconciled server priority", async () => {
+    const rejected = [];
+    const updater = createPriorityUpdater({
+      initialPriority: "medium",
+      save: async () => {
+        throw new Error("save failed");
+      },
+      onConfirmed() {},
+      onRejected: (error, confirmed, shouldRestore) => {
+        rejected.push({ message: error.message, confirmed, shouldRestore });
+      },
+    });
+
+    updater.reconcile("high");
+    await updater.change("medium");
+
+    assert.equal(updater.getConfirmed(), "high");
+    assert.equal(updater.getDesired(), "high");
+    assert.deepEqual(rejected, [
+      { message: "save failed", confirmed: "high", shouldRestore: true },
+    ]);
+  });
 });
