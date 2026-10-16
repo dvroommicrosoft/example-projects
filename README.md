@@ -12,6 +12,7 @@ target for agentic workflows (editing, testing, committing, opening PRs).
 
 - List / add / prioritize / toggle / remove triage items
 - Client-side title search and All/Open/Done filters with live item counts
+- Discoverable keyboard shortcuts and visible, stable item focus
 - In-memory store by default, with optional file-backed persistence
 - JSON API: `GET/POST /api/items`, `PATCH/DELETE /api/items/:id`, `GET /api/health`
 - Live, accessible API health banner that refreshes without reloading
@@ -70,6 +71,37 @@ For auto-restart on file changes during development:
 npm run dev
 ```
 
+## Keyboard workflow
+
+Open **Keyboard shortcuts** above the board filters for help and the
+**Enable character shortcuts for this page** checkbox. Uncheck it to disable
+all character shortcuts until the page is reloaded.
+
+| Key | Action |
+|-----|--------|
+| `/` | Focus search |
+| `n` | Focus new-item entry |
+| `j` / `k` | Focus next / previous visible item row |
+| `x` | Complete or reopen the focused item row |
+| `?` | Open and focus shortcut help |
+
+Shortcuts run outside inputs, textareas, selects, editable content, links,
+buttons, and the help disclosure control. They ignore held-key repeats,
+composition, and Ctrl/Alt/Command combinations, preserving normal typing and
+browser shortcuts. Shift is used only for `?`.
+
+Navigation follows the filtered item order without wrapping; from outside the
+list, `j` enters at the first item and `k` at the last. Tab still reaches every
+row and its existing checkbox, priority select, and remove button. Use Space
+on checkboxes and Enter on buttons; no shortcuts are required.
+
+After a list refresh, focus stays on the same row/control if it remains visible.
+If that row disappears, focus moves to the next row at its old position, or the
+previous row at the end, or search if no rows remain. Typing a filter keeps focus
+in search. Adding keeps focus in new-item entry unless you move elsewhere while
+the request is pending. Delayed item responses do not pull focus away from the
+control you are currently using.
+
 ## Test it
 
 ```bash
@@ -78,6 +110,24 @@ npm test
 
 Runs the built-in Node test runner (`node --test`) against the store
 and API. The suite uses Node's built-in test runner with no external dependencies required.
+
+For the focused keyboard and focus tests:
+
+```bash
+node --test test/keyboard.test.js test/items.test.js
+```
+
+The real-browser keyboard suite is opt-in. With Node 22+ (for its built-in
+WebSocket client) and a locally installed Chrome/Chromium executable, run:
+
+```bash
+TRIAGE_BROWSER=/path/to/chrome node --test test/keyboard-browser.test.js
+```
+
+It runs the actual UI against an isolated in-memory server, including native
+keyboard input, focus after mutations, failed requests, and delayed responses.
+Without `TRIAGE_BROWSER`, `npm test` explicitly skips this browser suite; the
+dependency-free unit and API tests still run on Node 18+.
 
 ## Syntax check
 

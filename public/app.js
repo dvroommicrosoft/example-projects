@@ -3,6 +3,7 @@
 
 import { buildReportsQuery, formatTotals } from "./reports.js";
 import { applyHealthView, createHealthMonitor } from "./health-status.js";
+import { captureItemFocus, createKeyboardHandler, restoreItemFocus } from "./keyboard.js";
 import {
   addItemRequest,
   countItemsByStatus,
@@ -26,6 +27,8 @@ const inputEl = document.getElementById("title-input");
 const priorityEl = document.getElementById("priority-input");
 const errorEl = document.getElementById("error-message");
 const priorityStatusEl = document.getElementById("priority-status");
+const shortcutsHelpEl = document.getElementById("keyboard-help");
+const shortcutsEnabledEl = document.getElementById("keyboard-enabled");
 const healthElements = {
   banner: document.getElementById("api-health"),
   label: document.getElementById("api-health-label"),
@@ -46,6 +49,7 @@ let selectedStatus = "all";
 let itemsLoaded = false;
 let itemsLoadFailed = false;
 const priorityUpdaters = new Map();
+const pendingToggles = new Set();
 
 function showError(message) {
   errorEl.textContent = message;
@@ -94,7 +98,8 @@ function getPriorityUpdater(item) {
   return updater;
 }
 
-function renderItems({ focusItemId, focusSelector } = {}) {
+function renderItems() {
+  const focus = captureItemFocus(listEl, document.activeElement);
   const visibleItems = filterItems(items, searchEl.value, selectedStatus);
   const counts = countItemsByStatus(items);
   listEl.innerHTML = "";
@@ -119,6 +124,9 @@ function renderItems({ focusItemId, focusSelector } = {}) {
     const li = document.createElement("li");
     li.className = "item" + (item.done ? " done" : "");
     li.dataset.id = item.id;
+    li.tabIndex = 0;
+    li.setAttribute("aria-labelledby", `item-title-${item.id}`);
+    li.setAttribute("aria-describedby", "keyboard-row-hint");
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -128,6 +136,7 @@ function renderItems({ focusItemId, focusSelector } = {}) {
     checkbox.addEventListener("change", () => toggleItem(item.id));
 
     const title = document.createElement("span");
+    title.id = `item-title-${item.id}`;
     title.className = "item-title";
     title.textContent = item.title;
 
@@ -163,18 +172,10 @@ function renderItems({ focusItemId, focusSelector } = {}) {
     listEl.append(li);
   }
 
-  if (focusItemId && focusSelector) {
-    const row = Array.from(listEl.children).find((element) => element.dataset.id === focusItemId);
-    const target = row?.querySelector(focusSelector);
-    if (target) {
-      target.focus();
-    } else {
-      statusFilterEls.find((button) => button.dataset.status === selectedStatus)?.focus();
-    }
-  }
+  restoreItemFocus(listEl, focus, searchEl);
 }
 
-async function fetchItems(focus = {}) {
+async function fetchItems() {
   try {
     const nextItems = await listItemsRequest(fetch);
     items = nextItems;
@@ -184,12 +185,12 @@ async function fetchItems(focus = {}) {
     for (const id of priorityUpdaters.keys()) {
       if (!itemIds.has(id)) priorityUpdaters.delete(id);
     }
-    renderItems(focus);
+    renderItems();
     return true;
   } catch (error) {
     showError(error.message);
     itemsLoadFailed = true;
-    renderItems(itemsLoaded ? focus : {});
+    renderItems();
     return false;
   }
 }
@@ -207,6 +208,8 @@ async function addItem(title, priority) {
 }
 
 async function toggleItem(id) {
+  if (pendingToggles.has(id)) return;
+  pendingToggles.add(id);
   clearError();
   try {
     const res = await fetch(`/api/items/${encodeURIComponent(id)}`, { method: "PATCH" });
@@ -214,9 +217,15 @@ async function toggleItem(id) {
       showError("Failed to update item");
       return;
     }
-    await fetchItems({ focusItemId: id, focusSelector: ".item-toggle" });
+    await fetchItems();
   } catch {
     showError("Failed to update item");
+  } finally {
+    pendingToggles.delete(id);
+    const checkbox = Array.from(listEl.children)
+      .find((row) => row.dataset.id === id)?.querySelector(".item-toggle");
+    const item = items.find((item) => item.id === id);
+    if (checkbox && item) checkbox.checked = item.done;
   }
 }
 
@@ -229,7 +238,7 @@ async function removeItem(id) {
       return;
     }
     priorityUpdaters.delete(id);
-    await fetchItems({ focusItemId: id, focusSelector: ".item-remove" });
+    await fetchItems();
   } catch {
     showError("Failed to remove item");
   }
@@ -263,13 +272,25 @@ formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   const title = inputEl.value.trim();
   if (!title) return;
+  const submittedValue = inputEl.value;
+  const submittedPriority = priorityEl.value;
+  const activeElement = document.activeElement;
   const added = await addItem(title, priorityEl.value);
   if (added) {
-    inputEl.value = "";
-    priorityEl.value = "medium";
+    if (inputEl.value === submittedValue) inputEl.value = "";
+    if (priorityEl.value === submittedPriority) priorityEl.value = "medium";
   }
-  inputEl.focus();
+  if (document.activeElement === activeElement) inputEl.focus();
 });
+
+document.addEventListener("keydown", createKeyboardHandler({
+  list: listEl,
+  search: searchEl,
+  input: inputEl,
+  help: shortcutsHelpEl,
+  enabled: shortcutsEnabledEl,
+  toggle: toggleItem,
+}));
 
 searchEl.addEventListener("input", () => renderItems());
 

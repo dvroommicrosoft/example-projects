@@ -61,6 +61,21 @@
           <h2 id="board-heading">Board</h2>
           <p id="items-summary" class="items-summary" aria-live="polite">Loading items…</p>
         </div>
+        <details id="keyboard-help" class="keyboard-help">
+          <summary>Keyboard shortcuts</summary>
+          <p>Outside form controls, links, and editable text:</p>
+          <dl>
+            <dt><kbd>/</kbd></dt><dd>Focus search</dd>
+            <dt><kbd>n</kbd></dt><dd>Focus new-item entry</dd>
+            <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Focus next / previous visible item</dd>
+            <dt><kbd>x</kbd></dt><dd>Complete or reopen the focused item row</dd>
+            <dt><kbd>?</kbd></dt><dd>Open this help</dd>
+          </dl>
+          <p>Use Tab to reach every control, Space to toggle a checkbox, and Enter
+            to activate buttons. Browser shortcuts with Ctrl, Alt, or Command are unchanged.</p>
+          <label><input id="keyboard-enabled" type="checkbox" checked /> Enable character shortcuts for this page</label>
+        </details>
+        <p id="keyboard-row-hint" class="sr-only">Item row. Tab to item controls. When character shortcuts are enabled, j and k navigate, x toggles completion.</p>
         <div class="board-controls">
           <div class="search-field">
             <label for="item-search">Search titles</label>
