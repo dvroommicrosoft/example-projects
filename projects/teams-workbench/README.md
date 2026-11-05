@@ -17,6 +17,8 @@ The Workbench surfaces follow the inspected ADX design: bordered neutral board g
 
 The board responds to its **own pane width**, not only the viewport: below 760px, status groups stack vertically and empty groups disappear. On small screens, conversations and details share a vertically split view. Search, owner filtering, status changes, checklist changes, thread replies, and scripted bot responses work locally.
 
+Groups run left to right as **Ready for you**, **Not Started**, **In Progress**, and **Completed**; there is no Blocked group or status. The 20 fictional tasks include 12 newly completed examples (13 completed tasks total), each linked to its own Teams thread. Product launch shows the completed work alongside active tasks. Seven-stage checklists use **Investigate, Plan, Implement, Preview, Review, Merge, Deploy**, with progress ranging from unstarted to fully checked.
+
 To interact with the bot, write a reply such as **`@Workbench what should we do next?`**, or use the **@ Workbench** button in the thread composer to insert the mention. A case-insensitive, standalone `@Workbench` mention triggers one clearly labeled, deterministic bot reply in that same thread using the linked task's current status and checklist. Ordinary replies do not trigger it. Each seeded thread includes an example mention and bot reply. The bot does not change task state, run commands, or contact a service.
 
 **This is a standalone mock, not a Teams app installation or live Workbench integration.** All names, messages, tasks and responses are fictional. There is no backend, real AI, authentication, Graph access, or connection to private Workbench APIs. State changes reset on reload. Decorative shell items are not implemented Teams features.
@@ -41,7 +43,7 @@ npm run test:e2e
 npm run preview -- --host 0.0.0.0
 ```
 
-Model tests cover mock-data integrity and hash routes. Browser tests cover task/thread/detail navigation, refresh/back, replies, checklists, filters, viewport and container responsiveness, thread-only bot interaction, and live OS theme switching. Playwright starts a production preview on port 4175; run `npm run build` first.
+Model tests cover mock-data integrity, group order, checklist progress, and hash routes. Browser tests cover task/thread/detail navigation, refresh/back, replies, seven-stage checklists, completed tasks, filters, viewport and container responsiveness, thread-only bot interaction, and live OS theme switching. Playwright starts a production preview on port 4175; run `npm run build` first.
 
 ## Navigation
 

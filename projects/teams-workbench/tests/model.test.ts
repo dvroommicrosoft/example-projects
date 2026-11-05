@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { channels, groupTasks, mentionsWorkbench, people, tasks, threads, workbenchBot, workbenchResponse } from '../src/data.ts'
+import { channels, groupTasks, mentionsWorkbench, people, statuses, tasks, threads, workbenchBot, workbenchResponse } from '../src/data.ts'
 import { initialRoute, parseRoute, routeHash, taskRoute } from '../src/navigation.ts'
 
 test('all generated tasks have valid unique identities, owners and same-channel threads', () => {
@@ -10,6 +10,7 @@ test('all generated tasks have valid unique identities, owners and same-channel 
   for (const task of tasks) {
     assert.ok(channels.some(channel => channel.id === task.channelId))
     assert.ok(people.some(person => person.id === task.ownerId))
+    assert.ok(statuses.includes(task.status))
     const thread = threads.find(item => item.id === task.threadId)
     assert.ok(thread)
     assert.equal(thread.channelId, task.channelId)
@@ -31,10 +32,34 @@ test('only standalone Workbench mentions trigger the bot and responses use curre
 
 test('grouping retains status order and explicitly represents empty groups', () => {
   const grouped = groupTasks(tasks.filter(task => task.channelId === 'launch'))
-  assert.deepEqual(grouped.map(group => group.label), ['Ready for you', 'Agent managed', 'Not started', 'Completed', 'Blocked'])
-  assert.equal(grouped.flatMap(group => group.tasks).length, 6)
-  assert.equal(grouped.find(group => group.status === 'Blocked')?.tasks.length, 0)
+  assert.deepEqual(grouped.map(group => group.label), ['Ready for you', 'Not Started', 'In Progress', 'Completed'])
+  assert.deepEqual(statuses, ['Not started', 'In progress', 'Ready for review', 'Completed'])
+  assert.equal(grouped.flatMap(group => group.tasks).length, 18)
+  assert.deepEqual(
+    groupTasks(tasks).flatMap(group => group.tasks.map(task => task.id)).sort((a, b) => a - b),
+    tasks.map(task => task.id).sort((a, b) => a - b),
+  )
+  assert.equal(tasks.find(task => task.id === 108)?.status, 'In progress')
   assert.ok(groupTasks([]).every(group => group.tasks.length === 0))
+})
+
+test('seven-stage checklists show varied progress and thirteen completed tasks', () => {
+  const stages = ['Investigate', 'Plan', 'Implement', 'Preview', 'Review', 'Merge', 'Deploy']
+  for (const task of tasks) {
+    assert.deepEqual(task.checklist.map(item => item.text), stages)
+    const done = task.checklist.filter(item => item.done).length
+    assert.deepEqual(task.checklist.map(item => item.done), stages.map((_, index) => index < done))
+    if (task.status === 'Completed') assert.equal(done, stages.length)
+    if (task.status === 'Not started') assert.equal(done, 0)
+  }
+  assert.deepEqual([...new Set(tasks.map(task => task.checklist.filter(item => item.done).length))].sort(), [0, 1, 2, 3, 4, 5, 7])
+  const completed = tasks.filter(task => task.status === 'Completed')
+  assert.equal(completed.length, 13)
+  assert.equal(completed.filter(task => task.id > 108).length, 12)
+  assert.equal(new Set(completed.map(task => task.title)).size, completed.length)
+  assert.equal(new Set(threads.map(thread => thread.messages[0].text)).size, threads.length)
+  const checklistItems = tasks.flatMap(task => task.checklist)
+  assert.equal(new Set(checklistItems).size, checklistItems.length)
 })
 
 test('each card route opens the matching channel, thread and task and round-trips', () => {

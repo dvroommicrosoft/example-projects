@@ -70,7 +70,6 @@
   .task-card.card-selected { outline-color: var(--adx-purple); }
   .task-pill { background: #393631; border-color: #59534b; color: var(--adx-text); }
   .task-pill.attention { background: #8440b3; border-color: #b16cde; color: white; }
-  .task-pill.caution { color: #ffc08c; }
   .track-segment, .track-end { background: #57524b; }
   .track-segment.done, .track-end.done { background: #65b77e; }
   .segment-tick { border-color: #a2988b; }

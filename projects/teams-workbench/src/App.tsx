@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, CircleDashed, Cloud,
   Columns3, GitFork, Globe, Hash, Inbox, LayoutGrid, ListFilter,
   LoaderCircle, MessageSquare, MessageSquareText, MoreHorizontal, PanelLeft,
-  Pause, Phone, Plus, Search, Send, Settings2, Smile, Sparkles, SquarePen, TriangleAlert, Users, X,
+  Pause, Phone, Plus, Search, Send, Settings2, Smile, Sparkles, SquarePen, Users, X,
 } from 'lucide-react'
 import { channels, groupTasks, mentionsWorkbench, people, personById, statuses, tasks as seedTasks, threads as seedThreads, workbenchBot, workbenchResponse } from './data'
 import type { Message, Person, Status, Task } from './data'
@@ -22,7 +22,6 @@ function Avatar({ person, small = false, presence = false }: { person: Person; s
 function StatusIcon({ status }: { status: Status }) {
   if (status === 'Ready for review') return <Inbox size={15} />
   if (status === 'Completed') return <CircleCheck size={15} />
-  if (status === 'Blocked') return <TriangleAlert size={15} />
   if (status === 'Not started') return <CircleDashed size={15} />
   return <Circle size={15} />
 }
@@ -30,7 +29,6 @@ function StatusIcon({ status }: { status: Status }) {
 function TaskPill({ task }: { task: Task }) {
   if (task.status === 'Ready for review') return <span className="task-pill attention"><Globe size={13} />Preview</span>
   if (task.status === 'In progress') return <span className="task-pill"><LoaderCircle size={13} />Running</span>
-  if (task.status === 'Blocked') return <span className="task-pill caution"><TriangleAlert size={13} />Waiting</span>
   return null
 }
 
