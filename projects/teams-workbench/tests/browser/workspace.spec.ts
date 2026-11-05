@@ -145,25 +145,40 @@ test('four ADX-style groups are ordered left to right with completed work and no
   await expect(otherDetails.getByRole('checkbox', { name: 'Deploy', exact: true })).toBeChecked()
 })
 
+test('Not Started tasks have no checklist on cards or in details, including after status edits', async ({ page }) => {
+  await page.goto('./')
+  for (const id of [102, 105]) {
+    const card = page.getByRole('button', { name: `Open task ${id}:` })
+    await expect(card.locator('.card-checklist, .checklist-track')).toHaveCount(0)
+    await card.click()
+    const details = page.getByRole('complementary', { name: `Task ${id} details` })
+    await expect(details.getByRole('region', { name: 'Task checklist' })).toHaveCount(0)
+    await expect(details.getByRole('button', { name: 'Expand task checklist' })).toHaveCount(0)
+    await expect(details.getByRole('checkbox')).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Selected Teams thread' })).toContainText('Suggested next step: Discuss the task and plan the work')
+    await page.getByRole('button', { name: 'Back to board' }).click()
+  }
+  await page.getByRole('button', { name: 'Open task 101:' }).click()
+  await page.getByLabel('Task status').selectOption('Not started')
+  const details = page.getByRole('complementary', { name: 'Task 101 details' })
+  await expect(details.getByRole('region', { name: 'Task checklist' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Back to board' }).click()
+  await expect(page.getByRole('button', { name: 'Open task 101:' }).locator('.card-checklist')).toHaveCount(0)
+  await page.getByLabel('Task status').selectOption('In progress')
+  await expect(details.getByRole('region', { name: 'Task checklist' })).toBeVisible()
+})
+
 test('short brainstorming and design-only tasks have relevant checklists and editable progress', async ({ page }) => {
   await page.goto('./')
-  const brainstorm = page.getByRole('button', { name: 'Open task 105:' })
-  await expect(brainstorm).toContainText('Brainstorm our success signals')
-  await expect(brainstorm.getByRole('img', { name: 'Checklist: 0 of 2 complete' })).toBeVisible()
-  await brainstorm.click()
-  const details = page.getByRole('complementary', { name: 'Task 105 details' })
-  await details.getByRole('button', { name: 'Expand task checklist' }).click()
-  await expect(details.locator('.checklist-row')).toHaveText(['Discuss', 'Capture ideas'])
-  await details.getByRole('checkbox', { name: 'Discuss', exact: true }).check()
-  await page.getByRole('button', { name: 'Back to board' }).click()
-  await expect(page.getByRole('button', { name: 'Open task 105:' }).getByRole('img', { name: 'Checklist: 1 of 2 complete' })).toBeVisible()
   await page.getByRole('button', { name: 'Open task 118:' }).click()
   const completedBrainstorm = page.getByRole('complementary', { name: 'Task 118 details' })
   await completedBrainstorm.getByRole('button', { name: 'Expand task checklist' }).click()
   await expect(completedBrainstorm.locator('.checklist-row')).toHaveText(['Brainstorm', 'Discuss', 'Summarize'])
   await expect(completedBrainstorm.getByRole('checkbox', { checked: true })).toHaveCount(3)
   await expect(page.getByRole('region', { name: 'Selected Teams thread' })).toContainText('no label changes are part of this task')
+  await completedBrainstorm.getByRole('checkbox', { name: 'Summarize', exact: true }).uncheck()
   await page.getByRole('button', { name: 'Back to board' }).click()
+  await expect(page.getByRole('button', { name: 'Open task 118:' }).getByRole('img', { name: 'Checklist: 2 of 3 complete' })).toBeVisible()
   await page.getByRole('button', { name: 'Open task 111:' }).click()
   const design = page.getByRole('complementary', { name: 'Task 111 details' })
   await design.getByRole('button', { name: 'Expand task checklist' }).click()
@@ -171,6 +186,39 @@ test('short brainstorming and design-only tasks have relevant checklists and edi
   await expect(design.getByRole('checkbox', { checked: true })).toHaveCount(3)
   await expect(page.getByRole('region', { name: 'Selected Teams thread' })).toContainText('Building the chosen layout will be a separate task')
 })
+
+for (const width of [1600, 390]) {
+  test(`future Check-in appears after Preview on the card and within the checklist at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 })
+    await page.goto('./')
+    const card = page.getByRole('button', { name: 'Open task 103:' })
+    await expect(card.locator('.task-pill')).toHaveText('Running')
+    await expect(card.getByRole('img', { name: 'Checklist: 2 of 7 complete; Check-in after Preview' })).toBeVisible()
+    const marker = card.locator('.track-check-in.scheduled')
+    await expect(marker).toBeVisible()
+    await expect(marker).toHaveAttribute('title', 'Check-in after Preview')
+    await expect(card.locator('.track-segment').nth(3)).toHaveAttribute('title', 'Preview: pending')
+    expect(await marker.evaluate(element => {
+      const markerBox = element.getBoundingClientRect()
+      return Math.abs(markerBox.x + markerBox.width / 2 - element.parentElement!.getBoundingClientRect().right)
+    })).toBeLessThan(1)
+    await card.click()
+    const details = page.getByRole('complementary', { name: 'Task 103 details' })
+    await details.getByRole('button', { name: 'Expand task checklist' }).click()
+    await expect(details.locator('.checklist-steps > *')).toHaveText([
+      'Investigate', 'Plan', 'Implement', 'Preview', 'Check-in · After Preview', 'Review', 'Merge', 'Deploy',
+    ])
+    await expect(details.getByRole('note', { name: 'Check-in after Preview' })).toBeVisible()
+    await expect(details.getByRole('checkbox', { name: 'Preview', exact: true })).not.toBeChecked()
+    await expect(details.getByRole('checkbox', { name: 'Implement', exact: true })).not.toBeChecked()
+    await expect(details.getByRole('checkbox', { checked: true })).toHaveCount(2)
+    await page.getByRole('button', { name: 'Back to board' }).click()
+    await expect(card.locator('.track-check-in.scheduled')).toBeVisible()
+    await page.getByLabel('Task status').selectOption('Completed')
+    await expect(card.locator('.track-check-in.scheduled')).toHaveCount(0)
+    await expect(details.getByRole('note', { name: 'Check-in after Preview' })).toHaveCount(0)
+  })
+}
 
 test('invalid direct link has a working recovery path and no console errors on valid routes', async ({ page }) => {
   const errors: string[] = []
@@ -229,6 +277,7 @@ test('Workbench bot interaction lives only in the Teams thread and requires a me
   await expect(botReplies.last()).toContainText('Suggested next step: Prototype')
   await expect(botReplies.last()).toContainText('No action was performed.')
   await page.getByRole('button', { name: 'Close task details' }).click()
+  await expect(details).toHaveCount(0)
   await page.getByLabel('Reply to this thread').fill('@workbench thanks!')
   await page.getByRole('button', { name: 'Send reply', exact: true }).click()
   await expect(botReplies).toHaveCount(3)

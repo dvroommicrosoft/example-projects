@@ -47,13 +47,14 @@ test('checklists mix short workflows with seven-stage delivery and thirteen comp
   const stages = ['Investigate', 'Plan', 'Implement', 'Preview', 'Review', 'Merge', 'Deploy']
   for (const task of tasks) {
     const done = task.checklist.filter(item => item.done).length
-    assert.ok(task.checklist.length > 0)
+    if (task.status === 'Not started') assert.equal(task.checklist.length, 0)
+    else assert.ok(task.checklist.length > 0)
     assert.equal(new Set(task.checklist.map(item => item.text)).size, task.checklist.length)
     assert.deepEqual(task.checklist.map(item => item.done), task.checklist.map((_, index) => index < done))
     if (task.status === 'Completed') assert.equal(done, task.checklist.length)
     if (task.status === 'Not started') assert.equal(done, 0)
   }
-  assert.deepEqual([...new Set(tasks.map(task => task.checklist.length))].sort(), [1, 2, 3, 4, 7])
+  assert.deepEqual([...new Set(tasks.map(task => task.checklist.length))].sort(), [0, 1, 2, 3, 4, 7])
   const deliveryTasks = tasks.filter(task => task.checklist.length === stages.length)
   assert.equal(deliveryTasks.length, 7)
   for (const task of deliveryTasks) assert.deepEqual(task.checklist.map(item => item.text), stages)
@@ -70,7 +71,7 @@ test('checklists mix short workflows with seven-stage delivery and thirteen comp
 test('design and brainstorming tasks stop at their own outcomes without software delivery steps', () => {
   const expectedSteps = new Map([
     [101, ['Investigate', 'Explore', 'Prototype', 'Review']],
-    [105, ['Discuss', 'Capture ideas']],
+    [105, []],
     [107, ['Explore layouts', 'Compare concepts', 'Choose a direction']],
     [111, ['Explore', 'Design', 'Review']],
     [118, ['Brainstorm', 'Discuss', 'Summarize']],
@@ -83,7 +84,26 @@ test('design and brainstorming tasks stop at their own outcomes without software
   }
   assert.deepEqual(tasks.filter(task => task.label === 'Brainstorming').map(task => task.status), ['Not started', 'Completed'])
   assert.match(workbenchResponse(tasks.find(task => task.id === 101)!), /Suggested next step: Prototype/)
-  assert.match(workbenchResponse(tasks.find(task => task.id === 105)!), /Suggested next step: Discuss/)
+  assert.match(workbenchResponse(tasks.find(task => task.id === 105)!), /Suggested next step: Discuss the task and plan the work/)
+  for (const task of tasks.filter(task => task.status === 'Not started')) {
+    assert.doesNotMatch(workbenchResponse(task), /Review the completed checklist/)
+  }
+})
+
+test('an In Progress task has a Check-in anchored to a future checklist step', () => {
+  const scheduled = tasks.filter(task => task.checkInAfter !== undefined)
+  assert.equal(scheduled.length, 1)
+  for (const task of scheduled) {
+    assert.equal(task.status, 'In progress')
+    const anchorIndex = task.checklist.findIndex(item => item.text === task.checkInAfter)
+    assert.ok(anchorIndex >= 0)
+    assert.ok(anchorIndex < task.checklist.length - 1)
+    assert.equal(task.checklist[anchorIndex].done, false)
+    const nextStepIndex = task.checklist.findIndex(item => !item.done)
+    assert.ok(anchorIndex > nextStepIndex)
+  }
+  assert.equal(scheduled[0].id, 103)
+  assert.equal(scheduled[0].checkInAfter, 'Preview')
 })
 
 test('each card route opens the matching channel, thread and task and round-trips', () => {

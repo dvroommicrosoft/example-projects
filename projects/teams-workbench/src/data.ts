@@ -14,6 +14,7 @@ export type Task = {
   status: Status
   label: string
   checklist: { text: string; done: boolean }[]
+  checkInAfter?: string
 }
 
 export const people: Person[] = [
@@ -39,10 +40,10 @@ function checklist(completed: number, stages = checklistStages): Task['checklist
 
 export const tasks: Task[] = [
   { id: 101, title: 'Shape the onboarding experience', description: 'Design-only exploration of the welcome flow, team invitation, and first project. Compare concepts and hand off a reviewed prototype; implementation is separate work.', channelId: 'launch', threadId: 'welcome-flow', ownerId: 'maya', status: 'In progress', label: 'Design', checklist: checklist(2, ['Investigate', 'Explore', 'Prototype', 'Review']) },
-  { id: 102, title: 'Build the launch checklist', description: 'Collect the final product, engineering, and communications milestones in a shared launch checklist.', channelId: 'launch', threadId: 'launch-checklist', ownerId: 'you', status: 'Not started', label: 'Planning', checklist: checklist(0, ['Collect milestones', 'Assign owners', 'Review']) },
-  { id: 103, title: 'Connect tasks to conversations', description: 'Keep decisions next to the work. Link each task to a Teams thread and open its details alongside the conversation.', channelId: 'launch', threadId: 'connected-work', ownerId: 'jordan', status: 'In progress', label: 'Integration', checklist: checklist(2) },
+  { id: 102, title: 'Build the launch checklist', description: 'Collect the final product, engineering, and communications milestones in a shared launch checklist.', channelId: 'launch', threadId: 'launch-checklist', ownerId: 'you', status: 'Not started', label: 'Planning', checklist: [] },
+  { id: 103, title: 'Connect tasks to conversations', description: 'Keep decisions next to the work. Link each task to a Teams thread and open its details alongside the conversation. A check-in is scheduled after Preview so the team can review the interaction before the remaining delivery steps.', channelId: 'launch', threadId: 'connected-work', ownerId: 'jordan', status: 'In progress', label: 'Integration', checklist: checklist(2), checkInAfter: 'Preview' },
   { id: 104, title: 'Review the product story', description: 'Align the team on a concise story that explains how the new workspace helps people move from conversation to action.', channelId: 'launch', threadId: 'product-story', ownerId: 'sam', status: 'Ready for review', label: 'Content', checklist: checklist(1, ['Draft', 'Review']) },
-  { id: 105, title: 'Brainstorm our success signals', description: 'Discuss possible success signals for the first release and capture promising ideas. This brainstorming session does not include building dashboards or instrumentation.', channelId: 'launch', threadId: 'success-signals', ownerId: 'you', status: 'Not started', label: 'Brainstorming', checklist: checklist(0, ['Discuss', 'Capture ideas']) },
+  { id: 105, title: 'Brainstorm our success signals', description: 'Discuss possible success signals for the first release and capture promising ideas. This brainstorming session does not include building dashboards or instrumentation.', channelId: 'launch', threadId: 'success-signals', ownerId: 'you', status: 'Not started', label: 'Brainstorming', checklist: [] },
   { id: 106, title: 'Create the shared component library', description: 'Document the core building blocks and their accessible interaction states.', channelId: 'launch', threadId: 'component-library', ownerId: 'maya', status: 'Completed', label: 'Design system', checklist: checklist(7) },
   { id: 107, title: 'Explore compact task cards', description: 'Compare design concepts for smaller panes and choose a direction. Deliver sketches and a recommendation, not an implementation.', channelId: 'design', threadId: 'compact-cards', ownerId: 'maya', status: 'In progress', label: 'Exploration', checklist: checklist(1, ['Explore layouts', 'Compare concepts', 'Choose a direction']) },
   { id: 108, title: 'Make thread links resilient', description: 'Preserve thread and task selection across refresh and browser navigation.', channelId: 'engineering', threadId: 'thread-routing', ownerId: 'jordan', status: 'In progress', label: 'Routing', checklist: checklist(5) },
@@ -63,7 +64,7 @@ export const tasks: Task[] = [
 const conversations: Record<number, { opening: string; reply: string }> = {
   101: { opening: 'I put together a first pass at the welcome flow. The idea is to get people into a real project before we ask them to configure anything. What do you think?', reply: 'Love the direction. Let’s keep the invitation step optional so people can explore first. I’ve linked the task so we can track the next iteration here.' },
   102: { opening: 'Let’s give launch day a little less guesswork. I’m pulling together a shared checklist for all three workstreams.', reply: 'I can add the engineering milestones. We should include a clear owner for the go/no-go decision.' },
-  103: { opening: 'What if the task board and our conversations felt like one workspace? Selecting a card could bring us straight to the right thread, with task details alongside.', reply: 'Exactly. The thread should be the conversation, not a duplicate discussion inside the task. This mock is a good way to try that interaction.' },
+  103: { opening: 'What if the task board and our conversations felt like one workspace? Selecting a card could bring us straight to the right thread, with task details alongside.', reply: 'Exactly. A check-in is scheduled after Preview so we can review the interaction together before continuing with review, merge, and deployment.' },
   104: { opening: 'The product story is ready for a fresh set of eyes. The theme is simple: less switching, more shared context.', reply: 'The opening is strong. Could we add a concrete example of a conversation turning into a task?' },
   105: { opening: 'Before we launch, let’s agree on what success looks like. I’d rather have three useful signals than a dashboard full of numbers.', reply: 'Time to first shared task feels like a good place to start. I’ll suggest a definition.' },
   106: { opening: 'The first set of shared components is ready: task cards, status labels, avatars, and detail panels.', reply: 'The keyboard and focus states look good. Marking this one complete. Nice work, team!' },
@@ -107,7 +108,9 @@ export function mentionsWorkbench(text: string): boolean {
 }
 
 export function workbenchResponse(task: Task): string {
-  const next = task.checklist.find(item => !item.done)?.text ?? 'Review the completed checklist with the team'
+  const next = task.status === 'Not started' || task.checklist.length === 0
+    ? 'Discuss the task and plan the work'
+    : task.checklist.find(item => !item.done)?.text ?? 'Review the completed checklist with the team'
   return `Simulated bot reply for #${task.id} "${task.title}": status is ${task.status}. Suggested next step: ${next}. Keep requests and decisions in this Teams thread; mention @Workbench to include me. No action was performed.`
 }
 

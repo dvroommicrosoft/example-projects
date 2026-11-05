@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, AtSign, Bell, Bot, CalendarDays, Check,
   ChevronDown, ChevronLeft, ChevronRight, Circle, CircleCheck, CircleDashed, Cloud,
@@ -33,9 +33,14 @@ function TaskPill({ task }: { task: Task }) {
 }
 
 function ChecklistTrack({ task }: { task: Task }) {
+  if (task.status === 'Not started' || task.checklist.length === 0) return null
   const complete = task.checklist.filter(item => item.done).length
-  return <div className="checklist-track" style={{ width: `${Math.min(task.checklist.length, 5) * 20}%` }} role="img" aria-label={`Checklist: ${complete} of ${task.checklist.length} complete`}>
-    {task.checklist.map((item, index) => <span className={`track-segment ${item.done ? 'done' : ''}`} key={item.text} title={`${item.text}: ${item.done ? 'complete' : 'pending'}`}>{index < task.checklist.length - 1 && <span className="segment-tick" />}</span>)}
+  const checkInAfter = task.status === 'In progress' ? task.checkInAfter : undefined
+  return <div className="checklist-track" style={{ width: `${Math.min(task.checklist.length, 5) * 20}%` }} role="img" aria-label={`Checklist: ${complete} of ${task.checklist.length} complete${checkInAfter ? `; Check-in after ${checkInAfter}` : ''}`}>
+    {task.checklist.map((item, index) => <span className={`track-segment ${item.done ? 'done' : ''}`} key={item.text} title={`${item.text}: ${item.done ? 'complete' : 'pending'}`}>
+      {index < task.checklist.length - 1 && <span className="segment-tick" />}
+      {checkInAfter === item.text && <span className="track-check-in scheduled" title={`Check-in after ${item.text}`}><Pause size={10} /></span>}
+    </span>)}
     {task.status === 'Ready for review' ? <span className="track-check-in"><Pause size={10} /></span> : <span className={`track-end ${complete === task.checklist.length ? 'done' : ''}`} />}
   </div>
 }
@@ -192,7 +197,7 @@ function TaskCard({ task, selected, onOpen }: { task: Task; selected: boolean; o
   return <button className={`task-card ${selected ? 'card-selected' : ''}`} onClick={onOpen} aria-label={`Open task ${task.id}: ${task.title}`}>
     <div className="card-topline"><TaskPill task={task} /><span className="task-number">#{task.id}</span><MoreHorizontal size={16} /></div>
     <div className="card-title-row">{task.status !== 'Completed' && <span className="unread-dot" />}<h4>{task.title}</h4></div>
-    <div className="card-checklist"><ChecklistTrack task={task} /></div>
+    {task.status !== 'Not started' && task.checklist.length > 0 && <div className="card-checklist"><ChecklistTrack task={task} /></div>}
     <div className="card-metadata"><Avatar person={personById(task.ownerId)} small /><span className="repository-chip"><GitFork size={12} />northstar</span><span className={`task-label label-${task.label.toLowerCase().replaceAll(' ', '-')}`}>{task.label}</span></div>
   </button>
 }
@@ -208,12 +213,15 @@ function TaskDetails({ task, onChange, onClose, onThread }: { task: Task; onChan
   return <aside className="task-details" aria-label={`Task ${task.id} details`}>
     <header className="detail-header"><div><span className="task-number">#{task.id}</span><h2>{task.title}</h2></div><Avatar person={personById(task.ownerId)} small /><button className="icon-button" aria-label="Close task details" onClick={onClose}><X size={18} /></button></header>
     <div className="detail-workspace">
-      <section className="pinned-checklist" aria-label="Task checklist">
+      {task.status !== 'Not started' && task.checklist.length > 0 && <section className="pinned-checklist" aria-label="Task checklist">
         <div className="checklist-heading"><ChecklistTrack task={task} /><span className="checklist-summary-count">{complete}/{task.checklist.length}</span><button className="icon-button" aria-label={checklistExpanded ? 'Collapse task checklist' : 'Expand task checklist'} aria-expanded={checklistExpanded} onClick={() => setChecklistExpanded(!checklistExpanded)}><ChevronDown size={15} className={checklistExpanded ? 'chevron-expanded' : ''} /></button></div>
-        {checklistExpanded && <><div className="checklist-steps">{task.checklist.map((item, index) => <label className={`checklist-row ${item.done ? 'checked' : ''}`} key={item.text}><input type="checkbox" checked={item.done} onChange={() => onChange({ ...task, checklist: task.checklist.map((entry, entryIndex) => entryIndex === index ? { ...entry, done: !entry.done } : entry) })} /><span>{item.text}</span>{item.done && <Check size={13} />}</label>)}</div>
+        {checklistExpanded && <><div className="checklist-steps">{task.checklist.map((item, index) => <Fragment key={item.text}>
+          <label className={`checklist-row ${item.done ? 'checked' : ''}`}><input type="checkbox" checked={item.done} onChange={() => onChange({ ...task, checklist: task.checklist.map((entry, entryIndex) => entryIndex === index ? { ...entry, done: !entry.done } : entry) })} /><span>{item.text}</span>{item.done && <Check size={13} />}</label>
+          {task.status === 'In progress' && task.checkInAfter === item.text && <div className="check-in-divider" role="note" aria-label={`Check-in after ${item.text}`}><span /><Pause size={12} />Check-in · After {item.text}<span /></div>}
+        </Fragment>)}</div>
           {task.status === 'Ready for review' && <div className="check-in-divider"><span />Check-in · Preview<span /></div>}
           <div className="checklist-complete"><CircleCheck size={15} /><span>Complete</span><span>{complete === task.checklist.length ? 'Ready' : 'After checklist'}</span></div></>}
-      </section>
+      </section>}
       <nav className="detail-tabs" aria-label="Task detail tabs">
         <span className="detail-section-label"><Settings2 size={15} />Properties</span>
         <button className="thread-tab" onClick={onThread}><MessageSquareText size={15} /><span>Teams thread</span></button>

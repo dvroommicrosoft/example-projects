@@ -106,6 +106,7 @@
 .track-end { width: 3px; height: 18px; border-radius: 1px; background: #e9e7e2; }
 .track-end.done { background: #398650; }
 .track-check-in { width: 19px; height: 19px; margin-left: -9px; border: 3px solid #a340e1; background: white; border-radius: 50%; display: grid; place-items: center; color: #a340e1; position: relative; }
+.track-check-in.scheduled { position: absolute; right: 0; top: 50%; margin-left: 0; transform: translate(50%, -50%); z-index: 1; }
 .card-metadata { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
 .card-metadata .avatar-small { width: 20px; height: 20px; font-size: 8px; }
 .repository-chip { border: 1px solid #e4e1dd; border-radius: 5px; padding: 2px 5px; display: inline-flex; align-items: center; gap: 4px; font-size: 10px; line-height: 14px; color: #66605b; white-space: nowrap; }
