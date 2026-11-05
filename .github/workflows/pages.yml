@@ -1,0 +1,65 @@
+name: Check examples and deploy Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: projects/teams-workbench/package-lock.json
+      - name: Check existing Tiny Triage application
+        run: npm test && npm run check
+      - name: Install mock dependencies
+        working-directory: projects/teams-workbench
+        run: npm ci
+      - name: Check and build mock
+        working-directory: projects/teams-workbench
+        run: npm test && npm run lint && npm run build
+      - name: Install browser
+        working-directory: projects/teams-workbench
+        run: npx playwright install --with-deps chromium
+      - name: Test production mock
+        working-directory: projects/teams-workbench
+        run: npm run test:e2e
+      - name: Assemble static site
+        run: |
+          mkdir -p .pages
+          cp pages/index.html .pages/index.html
+          cp -R projects/teams-workbench/dist .pages/teams-workbench
+          touch .pages/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: .pages
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

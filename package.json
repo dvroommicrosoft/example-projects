@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "check": "node --check server.js && node --check src/store.js && node --check src/persistence.js && node --check src/reports.js && node --check public/app.js && node --check public/items.js && node --check public/reports.js && node --check public/health-status.js"
   },
   "engines": {

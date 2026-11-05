@@ -1,5 +1,16 @@
 # Tiny Triage
 
+## GitHub Pages examples
+
+The [Teams Workbench mock](https://dvroommicrosoft.github.io/example-projects/teams-workbench/)
+lives in `projects/teams-workbench/`. It is a standalone, public-safe Teams/ADX
+demo with fictional data, thread-only bot mentions, and automatic OS light/dark
+themes. See [its README](projects/teams-workbench/README.md) for setup and checks.
+
+The Pages workflow publishes `pages/index.html` and the built mock only.
+Enable **Settings > Pages > Source > GitHub Actions** for deployment. Tiny
+Triage below still requires its Node server; its API is not hosted on Pages.
+
 A tiny task/issue triage board: a plain-HTML/CSS/JS front end served by a
 small Node HTTP server, with a minimal JSON API. Zero third-party
 dependencies — everything uses Node's built-in `http`/`fs` modules and the
@@ -76,7 +87,7 @@ npm run dev
 npm test
 ```
 
-Runs the built-in Node test runner (`node --test`) against the store
+Runs the built-in Node test runner against `test/*.test.js` for the store
 and API. The suite uses Node's built-in test runner with no external dependencies required.
 
 ## Syntax check
