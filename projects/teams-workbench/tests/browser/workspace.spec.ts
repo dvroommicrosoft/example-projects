@@ -220,6 +220,39 @@ for (const width of [1600, 390]) {
   })
 }
 
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`future Check-ins are gray and active Check-ins follow green segments in ${colorScheme} mode`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme })
+    await page.goto('./')
+    const gray = colorScheme === 'dark' ? 'rgb(189, 189, 189)' : 'rgb(115, 115, 115)'
+    const purple = colorScheme === 'dark' ? 'rgb(215, 166, 250)' : 'rgb(163, 64, 225)'
+    const green = colorScheme === 'dark' ? 'rgb(101, 183, 126)' : 'rgb(57, 134, 80)'
+    const future = page.getByRole('button', { name: 'Open task 103:' })
+    const scheduledMarker = future.locator('.track-check-in.scheduled')
+    await expect(scheduledMarker).toHaveCSS('color', gray)
+    await expect(scheduledMarker).toHaveCSS('border-top-color', gray)
+    const active = page.getByRole('button', { name: 'Open task 104:' })
+    await expect(active.getByRole('img', { name: 'Checklist: 2 of 2 complete' })).toBeVisible()
+    await expect(active.locator('.track-segment.done')).toHaveCount(2)
+    await expect(active.locator('.track-segment').nth(0)).toHaveCSS('background-color', green)
+    await expect(active.locator('.track-segment').nth(1)).toHaveCSS('background-color', green)
+    await expect(active.locator('.track-check-in')).toHaveCSS('border-top-color', purple)
+    await future.click()
+    const futureDetails = page.getByRole('complementary', { name: 'Task 103 details' })
+    await futureDetails.getByRole('button', { name: 'Expand task checklist' }).click()
+    const futureNote = futureDetails.getByRole('note', { name: 'Check-in after Preview' })
+    await expect(futureNote).toHaveCSS('color', gray)
+    expect(await textContrast(futureNote)).toBeGreaterThanOrEqual(4.5)
+    await page.getByRole('button', { name: 'Back to board' }).click()
+    await active.click()
+    const activeDetails = page.getByRole('complementary', { name: 'Task 104 details' })
+    await activeDetails.getByRole('button', { name: 'Expand task checklist' }).click()
+    await expect(activeDetails.getByRole('checkbox', { checked: true })).toHaveCount(2)
+    await expect(activeDetails.locator('.check-in-divider')).not.toHaveClass(/scheduled/)
+    await expect(page.getByLabel('Task status')).toHaveValue('Ready for review')
+  })
+}
+
 test('invalid direct link has a working recovery path and no console errors on valid routes', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))

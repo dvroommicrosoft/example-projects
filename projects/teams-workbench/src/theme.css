@@ -74,6 +74,7 @@
   .track-segment.done, .track-end.done { background: #65b77e; }
   .segment-tick { border-color: #a2988b; }
   .track-check-in { color: var(--adx-purple); border-color: var(--adx-purple); background: var(--adx-surface); }
+  .track-check-in.scheduled { color: #bdbdbd; border-color: #bdbdbd; }
   .task-label { background: #314031; color: #bdd9b4; }
   .label-planning, .label-strategy { background: #443c29; color: #e4ce95; }
   .label-integration { background: #2b3d4b; color: #b4d8f1; }
@@ -89,6 +90,8 @@
   .checklist-row.checked { color: var(--adx-green); }
   .check-in-divider { color: var(--adx-purple); }
   .check-in-divider > span { background: #79558f; }
+  .check-in-divider.scheduled { color: #bdbdbd; }
+  .check-in-divider.scheduled > span { background: #666666; }
   .checklist-complete, .properties-metadata, .task-properties-list, .detail-footer { border-color: var(--adx-border); }
   .detail-tabs { background: var(--adx-raised); border-color: var(--adx-border); }
   .properties-card { background: var(--adx-surface); border-color: var(--adx-border); }

@@ -106,6 +106,17 @@ test('an In Progress task has a Check-in anchored to a future checklist step', (
   assert.equal(scheduled[0].checkInAfter, 'Preview')
 })
 
+test('active Check-ins follow completed checklist work without completing the task', () => {
+  const ready = tasks.filter(task => task.status === 'Ready for review')
+  assert.ok(ready.length > 0)
+  for (const task of ready) {
+    assert.ok(task.checklist.length > 0)
+    assert.ok(task.checklist.every(item => item.done))
+  }
+  assert.equal(ready[0].id, 104)
+  assert.equal(ready[0].checklist.length, 2)
+})
+
 test('each card route opens the matching channel, thread and task and round-trips', () => {
   for (const task of tasks) {
     const route = taskRoute(task.id)
