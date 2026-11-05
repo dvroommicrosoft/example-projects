@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { channels, groupTasks, mentionsWorkbench, people, tasks, threads, workbenchBot, workbenchResponse } from '../src/data.ts'
+import { channels, groupTasks, mentionsWorkbench, people, statuses, tasks, threads, workbenchBot, workbenchResponse } from '../src/data.ts'
 import { initialRoute, parseRoute, routeHash, taskRoute } from '../src/navigation.ts'
 
 test('all generated tasks have valid unique identities, owners and same-channel threads', () => {
@@ -10,6 +10,7 @@ test('all generated tasks have valid unique identities, owners and same-channel 
   for (const task of tasks) {
     assert.ok(channels.some(channel => channel.id === task.channelId))
     assert.ok(people.some(person => person.id === task.ownerId))
+    assert.ok(statuses.includes(task.status))
     const thread = threads.find(item => item.id === task.threadId)
     assert.ok(thread)
     assert.equal(thread.channelId, task.channelId)
@@ -31,10 +32,89 @@ test('only standalone Workbench mentions trigger the bot and responses use curre
 
 test('grouping retains status order and explicitly represents empty groups', () => {
   const grouped = groupTasks(tasks.filter(task => task.channelId === 'launch'))
-  assert.deepEqual(grouped.map(group => group.label), ['Ready for you', 'Agent managed', 'Not started', 'Completed', 'Blocked'])
-  assert.equal(grouped.flatMap(group => group.tasks).length, 6)
-  assert.equal(grouped.find(group => group.status === 'Blocked')?.tasks.length, 0)
+  assert.deepEqual(grouped.map(group => group.label), ['Ready for you', 'Not Started', 'In Progress', 'Completed'])
+  assert.deepEqual(statuses, ['Not started', 'In progress', 'Ready for review', 'Completed'])
+  assert.equal(grouped.flatMap(group => group.tasks).length, 18)
+  assert.deepEqual(
+    groupTasks(tasks).flatMap(group => group.tasks.map(task => task.id)).sort((a, b) => a - b),
+    tasks.map(task => task.id).sort((a, b) => a - b),
+  )
+  assert.equal(tasks.find(task => task.id === 108)?.status, 'In progress')
   assert.ok(groupTasks([]).every(group => group.tasks.length === 0))
+})
+
+test('checklists mix short workflows with seven-stage delivery and thirteen completed tasks', () => {
+  const stages = ['Investigate', 'Plan', 'Implement', 'Preview', 'Review', 'Merge', 'Deploy']
+  for (const task of tasks) {
+    const done = task.checklist.filter(item => item.done).length
+    if (task.status === 'Not started') assert.equal(task.checklist.length, 0)
+    else assert.ok(task.checklist.length > 0)
+    assert.equal(new Set(task.checklist.map(item => item.text)).size, task.checklist.length)
+    assert.deepEqual(task.checklist.map(item => item.done), task.checklist.map((_, index) => index < done))
+    if (task.status === 'Completed') assert.equal(done, task.checklist.length)
+    if (task.status === 'Not started') assert.equal(done, 0)
+  }
+  assert.deepEqual([...new Set(tasks.map(task => task.checklist.length))].sort(), [0, 1, 2, 3, 4, 7])
+  const deliveryTasks = tasks.filter(task => task.checklist.length === stages.length)
+  assert.equal(deliveryTasks.length, 7)
+  for (const task of deliveryTasks) assert.deepEqual(task.checklist.map(item => item.text), stages)
+  assert.deepEqual([...new Set(deliveryTasks.map(task => task.checklist.filter(item => item.done).length))].sort(), [2, 5, 7])
+  const completed = tasks.filter(task => task.status === 'Completed')
+  assert.equal(completed.length, 13)
+  assert.equal(completed.filter(task => task.id > 108).length, 12)
+  assert.equal(new Set(completed.map(task => task.title)).size, completed.length)
+  assert.equal(new Set(threads.map(thread => thread.messages[0].text)).size, threads.length)
+  const checklistItems = tasks.flatMap(task => task.checklist)
+  assert.equal(new Set(checklistItems).size, checklistItems.length)
+})
+
+test('design and brainstorming tasks stop at their own outcomes without software delivery steps', () => {
+  const expectedSteps = new Map([
+    [101, ['Investigate', 'Explore', 'Prototype', 'Review']],
+    [105, []],
+    [107, ['Explore layouts', 'Compare concepts', 'Choose a direction']],
+    [111, ['Explore', 'Design', 'Review']],
+    [118, ['Brainstorm', 'Discuss', 'Summarize']],
+  ])
+  for (const [id, steps] of expectedSteps) {
+    const task = tasks.find(candidate => candidate.id === id)
+    assert.ok(task)
+    assert.deepEqual(task.checklist.map(item => item.text), steps)
+    assert.ok(task.checklist.every(item => !['Implement', 'Merge', 'Deploy'].includes(item.text)))
+  }
+  assert.deepEqual(tasks.filter(task => task.label === 'Brainstorming').map(task => task.status), ['Not started', 'Completed'])
+  assert.match(workbenchResponse(tasks.find(task => task.id === 101)!), /Suggested next step: Prototype/)
+  assert.match(workbenchResponse(tasks.find(task => task.id === 105)!), /Suggested next step: Discuss the task and plan the work/)
+  for (const task of tasks.filter(task => task.status === 'Not started')) {
+    assert.doesNotMatch(workbenchResponse(task), /Review the completed checklist/)
+  }
+})
+
+test('an In Progress task has a Check-in anchored to a future checklist step', () => {
+  const scheduled = tasks.filter(task => task.checkInAfter !== undefined)
+  assert.equal(scheduled.length, 1)
+  for (const task of scheduled) {
+    assert.equal(task.status, 'In progress')
+    const anchorIndex = task.checklist.findIndex(item => item.text === task.checkInAfter)
+    assert.ok(anchorIndex >= 0)
+    assert.ok(anchorIndex < task.checklist.length - 1)
+    assert.equal(task.checklist[anchorIndex].done, false)
+    const nextStepIndex = task.checklist.findIndex(item => !item.done)
+    assert.ok(anchorIndex > nextStepIndex)
+  }
+  assert.equal(scheduled[0].id, 103)
+  assert.equal(scheduled[0].checkInAfter, 'Preview')
+})
+
+test('active Check-ins follow completed checklist work without completing the task', () => {
+  const ready = tasks.filter(task => task.status === 'Ready for review')
+  assert.ok(ready.length > 0)
+  for (const task of ready) {
+    assert.ok(task.checklist.length > 0)
+    assert.ok(task.checklist.every(item => item.done))
+  }
+  assert.equal(ready[0].id, 104)
+  assert.equal(ready[0].checklist.length, 2)
 })
 
 test('each card route opens the matching channel, thread and task and round-trips', () => {
