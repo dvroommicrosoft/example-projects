@@ -1,0 +1,100 @@
+@media (prefers-color-scheme: dark) {
+  :root {
+    --teams-canvas: #1f1f1f;
+    --teams-chrome: #292929;
+    --teams-chrome-raised: #333333;
+    --teams-border: #484848;
+    --teams-text: #f0f0f0;
+    --teams-muted: #bdbdbd;
+    --teams-accent: #b6b8ff;
+    --teams-selection: #38385b;
+    --adx-surface: #242321;
+    --adx-raised: #2e2c29;
+    --adx-border: #4c4842;
+    --adx-text: #f1eee9;
+    --adx-muted: #c3bdb3;
+    --adx-purple: #d7a6fa;
+    --adx-green: #87c99b;
+  }
+
+  .teams-shell, .app-rail { background: #141414; }
+  .teams-topbar { background: var(--teams-chrome); color: var(--teams-text); }
+  .channel-sidebar, .rail-item.active { background: var(--teams-canvas); }
+  .workspace, .primary-pane, .teams-thread-pane, .skip-link { background: var(--teams-canvas); color: var(--teams-text); }
+  .topbar-search { background: var(--teams-canvas); border-color: var(--teams-border); color: var(--teams-muted); }
+  .topbar-search input, .reply-form textarea { color: var(--teams-text); background: transparent; }
+  .topbar-search:focus-within, .task-search:focus-within { outline-color: var(--teams-accent); }
+  input::placeholder, textarea::placeholder { color: var(--teams-muted); opacity: 1; }
+  .topbar-search > span, .demo-badge, .rail-item, .sidebar-heading-tools,
+  .sidebar-pills > svg, .quick-count, .sidebar-section-label, .sidebar-footer,
+  .channel-header-tools, .feed-date, .message-meta > span,
+  .thread-replies-link > span:last-child, .feed-end, .thread-channel-label,
+  .reply-tools > span, .local-reply-note, .icon-button { color: var(--teams-muted); }
+  .rail-item.active, .thread-replies-link, .text-button, .mention-button,
+  .reply-form > label { color: var(--teams-accent); }
+  .rail-item.active::before, .channel-tabs .selected::after { background: var(--teams-accent); }
+  .sidebar-pills > span { background: var(--teams-chrome); color: var(--teams-text); border-color: var(--teams-border); }
+  .sidebar-pills .selected { color: #d3d4ff; background: var(--teams-selection); border-color: #7376b6; }
+  .quick-views > *, .channel-links button, .channel-tabs button, .shared-tab,
+  .message-meta strong { color: var(--teams-text); }
+  .channel-links button.selected { background: var(--teams-chrome-raised); color: var(--teams-text); box-shadow: 0 0 0 1px var(--teams-border); }
+  .channel-links button:hover, .icon-button:hover { background: var(--teams-chrome-raised); }
+  .channel-links .unread-dot { background: var(--teams-text); }
+  .channel-tabs .selected { color: var(--teams-text); }
+  .sidebar-at { color: #f6a96a; }
+  .channel-sidebar, .sidebar-pills, .channel-header, .teams-thread-pane,
+  .thread-pane-header, .reply-form { border-color: var(--teams-border); }
+  .feed-date > span { background: var(--teams-border); }
+  .channel-bubble, .thread-bubble { background: var(--teams-chrome); color: var(--teams-text); }
+  .post-selected .channel-bubble { background: var(--teams-selection); }
+  .thread-task-link { color: var(--teams-accent); border-color: #64659a; }
+  .message-meta > .bot-badge { color: #d3d4ff; background: var(--teams-selection); }
+  .avatar-presence, .reply-avatars .avatar { border-color: var(--teams-canvas); }
+
+  .workbench-querybar > div, .mock-label, .board-view-label > span,
+  .task-search, .filter-button, .grouping-label, .group-heading,
+  .task-number, .card-topline > svg, .repository-chip, .empty-group-note,
+  .board-footer, .empty-board { color: var(--adx-muted); }
+  .workbench-querybar strong, .task-search input, .group-heading h3 { color: var(--adx-text); }
+  .board-toolbar, .board-view-label > span, .task-search, .filter-button,
+  .task-group, .group-count, .task-card, .repository-chip,
+  .empty-group-note, .board-footer { border-color: var(--adx-border); }
+  .filter-button.selected { background: #40304e; color: var(--adx-purple); border-color: #9c71ba; }
+  .task-group { background: var(--adx-surface); }
+  .task-group.ready-group { background: #302638; }
+  .ready-group .group-heading > svg { color: var(--adx-purple); }
+  .task-group[data-status="Completed"] .group-heading > svg { color: var(--adx-green); }
+  .group-count { color: var(--adx-muted); background: var(--adx-raised); }
+  .task-card { background: var(--adx-raised); color: var(--adx-text); }
+  .task-card:hover { background: #383530; border-color: #8c8275; }
+  .task-card.card-selected { outline-color: var(--adx-purple); }
+  .task-pill { background: #393631; border-color: #59534b; color: var(--adx-text); }
+  .task-pill.attention { background: #8440b3; border-color: #b16cde; color: white; }
+  .task-pill.caution { color: #ffc08c; }
+  .track-segment, .track-end { background: #57524b; }
+  .track-segment.done, .track-end.done { background: #65b77e; }
+  .segment-tick { border-color: #a2988b; }
+  .track-check-in { color: var(--adx-purple); border-color: var(--adx-purple); background: var(--adx-surface); }
+  .task-label { background: #314031; color: #bdd9b4; }
+  .label-planning, .label-strategy { background: #443c29; color: #e4ce95; }
+  .label-integration { background: #2b3d4b; color: #b4d8f1; }
+  .label-content { background: #482f32; color: #f0bdc1; }
+
+  .task-details { background: var(--adx-surface); border-color: var(--adx-border); }
+  .detail-header, .pinned-checklist, .properties-card-header { background: var(--adx-raised); border-color: var(--adx-border); }
+  .detail-header h2, .detail-workspace, .detail-section-label { color: var(--adx-text); }
+  .checklist-heading, .checklist-row, .checklist-complete, .detail-tabs button,
+  .properties-card-header, .task-properties-list > div, .detail-footer { color: var(--adx-muted); }
+  .checklist-row input { border-color: #a79e91; }
+  .checklist-row input:checked { background: #398650; border-color: #65b77e; }
+  .checklist-row.checked { color: var(--adx-green); }
+  .check-in-divider { color: var(--adx-purple); }
+  .check-in-divider > span { background: #79558f; }
+  .checklist-complete, .properties-metadata, .task-properties-list, .detail-footer { border-color: var(--adx-border); }
+  .detail-tabs { background: var(--adx-raised); border-color: var(--adx-border); }
+  .properties-card { background: var(--adx-surface); border-color: var(--adx-border); }
+  .properties-card-header select { color: var(--adx-text); }
+  .task-description { color: var(--adx-text); }
+  .task-properties-list button { color: var(--adx-purple); }
+  .not-found { color: var(--teams-text); }
+}

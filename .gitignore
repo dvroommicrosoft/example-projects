@@ -2,3 +2,9 @@ node_modules/
 data/
 *.log
 .DS_Store
+.pages/
+.preview-site/
+projects/teams-workbench/dist/
+projects/teams-workbench/test-results/
+projects/teams-workbench/playwright-report/
+projects/teams-workbench/*.tsbuildinfo
