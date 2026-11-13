@@ -38,11 +38,15 @@ jobs:
       - name: Test production mock
         working-directory: projects/teams-workbench
         run: npm run test:e2e
+      - name: Install, check and build Concorde example
+        working-directory: projects/concorde-threejs
+        run: npm ci && npm test && npm run lint && npm run build
       - name: Assemble static site
         run: |
           mkdir -p .pages
           cp pages/index.html .pages/index.html
           cp -R projects/teams-workbench/dist .pages/teams-workbench
+          cp -R projects/concorde-threejs/dist .pages/concorde-threejs
           touch .pages/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
