@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Place de la Concorde — three.js scene</title>
+    <style>
+      :root { --bg:#f4efe6; --fg:#2a2620; --panel:rgba(255,252,246,.88); --accent:#8a5a1c; --border:#cfc4b0; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#0e1220; --fg:#ece6d8; --panel:rgba(20,25,44,.88); --accent:#e8b86a; --border:#3a4262; }
+      }
+      html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:system-ui,sans-serif; overflow:hidden; }
+      #app { position:fixed; inset:0; }
+      #app canvas { display:block; width:100%; height:100%; touch-action:none; }
+      #hud { position:fixed; top:0; left:0; right:0; padding:.6rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; pointer-events:none; }
+      #hud > * { pointer-events:auto; }
+      #hud h1 { font-size:1rem; margin:0; padding:.4rem .7rem; background:var(--panel); border:1px solid var(--border); border-radius:.5rem; }
+      #views { display:flex; flex-wrap:wrap; gap:.4rem; }
+      #views button { font:inherit; font-size:.9rem; min-height:44px; padding:0 .9rem; color:var(--fg); background:var(--panel); border:1px solid var(--border); border-radius:.5rem; cursor:pointer; }
+      #views button[aria-pressed="true"] { border-color:var(--accent); color:var(--accent); font-weight:600; }
+      #views button:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+      #message { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:2rem; text-align:center; }
+      #message.show { display:flex; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <header id="hud">
+      <h1>Place de la Concorde, Paris</h1>
+      <nav id="views" aria-label="Viewpoints"></nav>
+    </header>
+    <div id="message" role="alert"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
