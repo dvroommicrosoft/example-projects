@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="A stylized 3D interpretation of the Place de la Concorde in Paris." />
+    <title>Place de la Concorde — a stylized 3D study</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene" aria-label="Interactive 3D view of the Place de la Concorde" tabindex="0"></canvas>
+      <header class="panel intro">
+        <p class="eyebrow">Paris · 8<sup>e</sup> arrondissement</p>
+        <h1>Place de la Concorde</h1>
+        <p class="lede">
+          A stylized, procedural study of the plaza at late afternoon: the Luxor Obelisk, the twin fountains,
+          and the palace facades along the rue Royale.
+        </p>
+        <ul class="landmarks">
+          <li><strong>Obélisque de Louxor</strong> — a roughly 23&nbsp;m pharaonic monolith, raised on its pedestal at the centre.</li>
+          <li><strong>Fontaines</strong> — a pair of basins to the north and south, here animated.</li>
+          <li><strong>Hôtel de la Marine &amp; Hôtel de Crillon</strong> — the colonnaded palaces closing the north side.</li>
+        </ul>
+        <p class="note">An artistic interpretation, not a survey.</p>
+      </header>
+      <section class="panel controls" aria-label="View controls">
+        <div class="buttons">
+          <button type="button" id="reset" aria-keyshortcuts="R">Reset view</button>
+          <button type="button" id="pause" aria-pressed="false">Pause water</button>
+        </div>
+        <details class="help" open>
+          <summary>Controls</summary>
+          <dl>
+            <dt>Orbit</dt><dd>Drag, or ← → ↑ ↓</dd>
+            <dt>Pan</dt><dd>Right-drag / two fingers, or Shift + arrows</dd>
+            <dt>Zoom</dt><dd>Scroll / pinch, or + and −</dd>
+            <dt>Reset</dt><dd>R or the button</dd>
+          </dl>
+        </details>
+      </section>
+      <div id="status" class="status" role="status" aria-live="polite" hidden></div>
+      <div id="fallback" class="fallback" role="alert" hidden>
+        <h2 id="fallback-title"></h2>
+        <p id="fallback-body"></p>
+        <button type="button" id="retry" hidden>Reload viewer</button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
