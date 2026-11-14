@@ -8,3 +8,7 @@ projects/teams-workbench/dist/
 projects/teams-workbench/test-results/
 projects/teams-workbench/playwright-report/
 projects/teams-workbench/*.tsbuildinfo
+projects/place-de-la-concorde/dist/
+projects/place-de-la-concorde/test-results/
+projects/place-de-la-concorde/playwright-report/
+projects/place-de-la-concorde/*.tsbuildinfo

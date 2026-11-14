@@ -7,7 +7,12 @@ lives in `projects/teams-workbench/`. It is a standalone, public-safe Teams/ADX
 demo with fictional data, thread-only bot mentions, and automatic OS light/dark
 themes. See [its README](projects/teams-workbench/README.md) for setup and checks.
 
-The Pages workflow publishes `pages/index.html` and the built mock only.
+The [Place de la Concorde model](https://dvroommicrosoft.github.io/example-projects/place-de-la-concorde/)
+lives in `projects/place-de-la-concorde/`. It is a stylized, procedural Three.js
+scene (an artistic approximation with no external assets). See
+[its README](projects/place-de-la-concorde/README.md) for setup, controls and checks.
+
+The Pages workflow publishes `pages/index.html` and the built examples only.
 Enable **Settings > Pages > Source > GitHub Actions** for deployment. Tiny
 Triage below still requires its Node server; its API is not hosted on Pages.
 
