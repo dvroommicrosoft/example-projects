@@ -23,7 +23,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: projects/teams-workbench/package-lock.json
+          cache-dependency-path: |
+            projects/teams-workbench/package-lock.json
+            projects/place-de-la-concorde/package-lock.json
       - name: Check existing Tiny Triage application
         run: npm test && npm run check
       - name: Install mock dependencies
@@ -38,11 +40,24 @@ jobs:
       - name: Test production mock
         working-directory: projects/teams-workbench
         run: npm run test:e2e
+      - name: Install Place de la Concorde dependencies
+        working-directory: projects/place-de-la-concorde
+        run: npm ci
+      - name: Check and build Place de la Concorde
+        working-directory: projects/place-de-la-concorde
+        run: npm test && npm run lint && npm run build
+      - name: Install Place de la Concorde browser
+        working-directory: projects/place-de-la-concorde
+        run: npx playwright install --with-deps chromium
+      - name: Test production Place de la Concorde
+        working-directory: projects/place-de-la-concorde
+        run: npm run test:e2e
       - name: Assemble static site
         run: |
           mkdir -p .pages
           cp pages/index.html .pages/index.html
           cp -R projects/teams-workbench/dist .pages/teams-workbench
+          cp -R projects/place-de-la-concorde/dist .pages/place-de-la-concorde
           touch .pages/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
