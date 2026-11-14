@@ -48,7 +48,7 @@ const LANDMARKS: Landmark[] = [
     label: 'Fountains',
     title: 'Fontaines de la Concorde',
     text: 'Two bronze and stone fountains stand north and south of the obelisk, with tritons, nereids and tiered basins, each some 42 m from the centre.',
-    pose: pose([62, 16, 0], [0, 3, 0]),
+    pose: pose([104, 28, 0], [0, 3, 0]),
   },
   {
     id: 'overview',
@@ -202,7 +202,15 @@ export function createControls({ camera, renderer }: ControlsOptions): SceneCont
     }
     const lm = LANDMARKS.find((l) => l.id === id);
     if (!lm) return;
-    goTo(lm.pose);
+    if (lm.id === 'fountains') {
+      const horizontalHalfFov = Math.atan(
+        Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect,
+      );
+      const distance = THREE.MathUtils.clamp(64 / Math.tan(horizontalHalfFov), 104, 256);
+      goTo(pose([distance, distance * 0.24 + 3, 0], [0, 3, 0]));
+    } else {
+      goTo(lm.pose);
+    }
     setInfo(lm.title, lm.text, lm.id);
   };
   toolbar.addEventListener('click', onToolbarClick);
