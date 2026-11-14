@@ -283,7 +283,7 @@ export function createFountains(): { group: THREE.Group; update(deltaSeconds: nu
 
   const update = (deltaSeconds: number, elapsedSeconds: number) => {
     const reduced = reducedMotion?.matches === true;
-    const speed = reduced ? 0.25 : 1;
+    const speed = reduced ? 0 : 1;
     // Clamp spikes (e.g. background tabs) so arcs never jump.
     flowClock += Math.min(Math.max(deltaSeconds, 0), MAX_FRAME_DELTA) * speed;
     const flow = reduced ? 0.7 : 1;

@@ -30,6 +30,14 @@ Source layout (each module owns one area and has no import-time side effects):
 
 Drag to orbit, scroll or pinch to zoom. Buttons: **Reset view**, **Obelisk**,
 **Fountains** and **Grand overview** move the camera to presets.
+Right-drag or use two fingers to pan. With the canvas focused, use arrow keys to
+pan, `+` / `-` to zoom and `R` to reset. Reduced-motion preferences freeze the
+water and remove camera transitions; a stationary reduced-motion view renders
+only when its camera or viewport changes. Static shadows are cached.
+
+The renderer caps device pixel ratio at 1.75, releases scene and environment
+resources on teardown, and shows an accessible reload panel if WebGL is
+unavailable or the graphics context is lost.
 
 ## Setup
 

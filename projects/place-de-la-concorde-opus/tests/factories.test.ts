@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { createObelisk } from '../src/landmarks/obelisk'
 import { createFountains } from '../src/landmarks/fountains'
 import { createGround } from '../src/environment/ground'
 import { createBuildings } from '../src/environment/buildings'
 import { createStreetFurniture } from '../src/environment/streetFurniture'
+import { createScene } from '../src/scene'
 
 const box = (o: THREE.Object3D) => new THREE.Box3().setFromObject(o)
 const meshes = (o: THREE.Object3D) => {
@@ -84,8 +85,37 @@ describe('environment', () => {
     for (const m of meshes(g)) {
       const p = m.geometry.getAttribute('position')
       expect(p.count).toBeGreaterThan(0)
-      expect(Number.isFinite(p.array[0])).toBe(true)
+      expect(Array.from(p.array).every(Number.isFinite)).toBe(true)
     }
-    g.traverse((c) => expect(c instanceof THREE.Camera).toBe(false))
+    g.traverse((c) => expect(c instanceof THREE.Camera || c instanceof THREE.Light).toBe(false))
+  })
+})
+
+describe('scene composition', () => {
+  it('assembles all landmarks with a perspective camera and daylight', () => {
+    const world = createScene()
+    expect(world.camera).toBeInstanceOf(THREE.PerspectiveCamera)
+    expect(world.camera.position.y).toBeGreaterThan(20)
+    for (const name of ['ground-and-streets', 'surrounding-paris', 'fountains']) {
+      expect(world.scene.getObjectByName(name)).toBeDefined()
+    }
+    expect(world.scene.getObjectByName('hotel-de-crillon')).toBeDefined()
+    expect(world.scene.getObjectByName('hotel-de-la-marine')).toBeDefined()
+    expect(world.scene.getObjectByName('afternoon-sun')).toBeInstanceOf(THREE.DirectionalLight)
+    expect(world.scene.getObjectByName('sky-and-ground-light')).toBeInstanceOf(THREE.HemisphereLight)
+    world.update(1 / 60, 1)
+    world.dispose()
+  })
+
+  it('disposes every shared geometry and material once and clears the scene', () => {
+    const world = createScene()
+    const geometries = new Set(meshes(world.scene).map((m) => m.geometry))
+    const materials = new Set(meshes(world.scene).flatMap((m) => Array.isArray(m.material) ? m.material : [m.material]))
+    const disposals = [...geometries, ...materials].map((resource) => vi.spyOn(resource, 'dispose'))
+    world.dispose()
+    for (const dispose of disposals) expect(dispose).toHaveBeenCalledTimes(1)
+    expect(world.scene.children).toHaveLength(0)
+    world.dispose()
+    for (const dispose of disposals) expect(dispose).toHaveBeenCalledTimes(1)
   })
 })

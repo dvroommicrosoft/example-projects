@@ -29,6 +29,27 @@ body {
   overflow: hidden;
 }
 
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+.pc-error {
+  margin: 15vh auto;
+  padding: 24px;
+  max-width: 500px;
+  font-family: system-ui, sans-serif;
+  color: #2b2118;
+  background: #faf4e8;
+  border-radius: 12px;
+}
+
+.pc-error button {
+  min-height: 44px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
 canvas[data-testid='scene-canvas'] {
   display: block;
   width: 100%;
