@@ -1,0 +1,218 @@
+:root {
+  color-scheme: light dark;
+  --pc-ink: #2b2118;
+  --pc-paper: rgba(250, 244, 232, 0.86);
+  --pc-line: rgba(120, 92, 48, 0.35);
+  --pc-gold: #b88a2e;
+  --pc-gold-strong: #8a6414;
+  --pc-muted: #5e5140;
+  --pc-focus: #1c5fa8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pc-ink: #f4ead7;
+    --pc-paper: rgba(32, 26, 20, 0.84);
+    --pc-line: rgba(224, 184, 104, 0.35);
+    --pc-gold: #e0b868;
+    --pc-gold-strong: #f0cd86;
+    --pc-muted: #cdbda1;
+    --pc-focus: #8cc4ff;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #cfd8e3;
+  overflow: hidden;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+.pc-error {
+  margin: 15vh auto;
+  padding: 24px;
+  max-width: 500px;
+  font-family: system-ui, sans-serif;
+  color: #2b2118;
+  background: #faf4e8;
+  border-radius: 12px;
+}
+
+.pc-error button {
+  min-height: 44px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+canvas[data-testid='scene-canvas'] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+canvas[data-testid='scene-canvas']:focus-visible {
+  outline: 3px solid var(--pc-focus);
+  outline-offset: -3px;
+}
+
+.pc-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  pointer-events: none;
+  color: var(--pc-ink);
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+}
+
+.pc-controls > * {
+  pointer-events: auto;
+}
+
+.pc-toolbar {
+  align-self: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px;
+  background: var(--pc-paper);
+  border: 1px solid var(--pc-line);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(60, 40, 10, 0.18);
+}
+
+.pc-button {
+  min-height: 40px;
+  padding: 0 14px;
+  font: 600 0.82rem/1 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--pc-ink);
+  background: transparent;
+  border: 1px solid var(--pc-line);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pc-button:hover {
+  background: color-mix(in srgb, var(--pc-gold) 22%, transparent);
+  border-color: var(--pc-gold);
+}
+
+.pc-button:focus-visible {
+  outline: 3px solid var(--pc-focus);
+  outline-offset: 2px;
+}
+
+.pc-button[aria-pressed='true'] {
+  background: var(--pc-gold);
+  border-color: var(--pc-gold-strong);
+  color: #1d1408;
+}
+
+.pc-button-reset {
+  border-style: dashed;
+}
+
+.pc-info {
+  align-self: flex-start;
+  max-width: min(380px, 100%);
+  padding: 12px 16px;
+  background: var(--pc-paper);
+  border: 1px solid var(--pc-line);
+  border-left: 4px solid var(--pc-gold);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(60, 40, 10, 0.18);
+}
+
+.pc-info-title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.pc-info-text {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--pc-muted);
+}
+
+.pc-hint {
+  align-self: flex-start;
+  margin: 8px 0 0;
+  max-width: min(520px, 100%);
+  padding: 4px 10px;
+  font: 0.72rem/1.4 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  color: var(--pc-muted);
+  background: var(--pc-paper);
+  border-radius: 999px;
+}
+
+/* Toolbar at the top, info and hint at the bottom. */
+.pc-toolbar {
+  grid-row: 1;
+}
+
+.pc-info {
+  grid-row: 3;
+}
+
+.pc-hint {
+  grid-row: 4;
+}
+
+@media (max-width: 600px) {
+  .pc-toolbar {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .pc-button {
+    flex: 1 1 calc(50% - 6px);
+    min-height: 44px;
+  }
+
+  .pc-info {
+    padding: 10px 12px;
+  }
+
+  .pc-info-text {
+    font-size: 0.82rem;
+  }
+
+  .pc-hint {
+    border-radius: 10px;
+  }
+}
+
+@media (max-height: 480px) {
+  .pc-info-text,
+  .pc-hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-button {
+    transition: none;
+  }
+}
